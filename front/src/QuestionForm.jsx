@@ -49,23 +49,15 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onComplete }) {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3001/api/respuestas', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          idea_id,
-          generic_question_id: currentQuestion.id,
-          respuesta: respuesta.trim(),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || 'Error al guardar la respuesta');
-      }
+      // Get existing answers from localStorage (per idea_id)
+      const storageKey = `jarvis_respuestas_${idea_id}`;
+      const stored = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      
+      // Add new answer
+      stored[currentQuestion.id] = respuesta.trim();
+      
+      // Save back to localStorage
+      localStorage.setItem(storageKey, JSON.stringify(stored));
 
       setRespuesta('');
 
