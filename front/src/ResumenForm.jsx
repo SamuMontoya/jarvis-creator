@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-function ResumenForm({ idea_id, onComplete, onBack }) {
+function ResumenForm({ idea_id, onComplete, onBack, onEditQuestion }) {
   const [idea, setIdea] = useState(null);
   const [respuestas, setRespuestas] = useState([]);
   const [questions, setQuestions] = useState([]);
@@ -14,11 +14,9 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
       setError(null);
 
       try {
-        // Get answers from localStorage
         const storageKey = `jarvis_respuestas_${idea_id}`;
         const storedAnswers = JSON.parse(localStorage.getItem(storageKey) || '{}');
         
-        // Fetch idea and questions in parallel
         const [ideaResponse, questionsResponse] = await Promise.all([
           fetch(`http://localhost:3001/api/ideas/${idea_id}`),
           fetch('http://localhost:3001/api/questions'),
@@ -38,7 +36,6 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
         if (ideaData.idea) setIdea(ideaData.idea);
         if (questionsData.questions) setQuestions(questionsData.questions);
         
-        // Convert localStorage object to array format expected by UI
         const respuestasArray = Object.entries(storedAnswers).map(([generic_question_id, respuesta]) => ({
           generic_question_id,
           respuesta,
@@ -54,7 +51,6 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
     fetchData();
   }, [idea_id]);
 
-  // Build question map for easy lookup
   const questionMap = {};
   questions.forEach(q => {
     questionMap[q.id] = q.pregunta;
@@ -65,7 +61,6 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
     setError(null);
 
     try {
-      // Get answers from localStorage
       const storageKey = `jarvis_respuestas_${idea_id}`;
       const storedAnswers = JSON.parse(localStorage.getItem(storageKey) || '{}');
       
@@ -73,7 +68,6 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
         throw new Error('No hay respuestas para guardar');
       }
 
-      // POST all answers to /api/respuestas
       for (const [generic_question_id, respuesta] of Object.entries(storedAnswers)) {
         const response = await fetch('http://localhost:3001/api/respuestas', {
           method: 'POST',
@@ -94,10 +88,8 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
         }
       }
 
-      // Clear localStorage after successful save
       localStorage.removeItem(storageKey);
 
-      // Update idea state to 'refined'
       const patchResponse = await fetch(`http://localhost:3001/api/ideas/${idea_id}`, {
         method: 'PATCH',
         headers: {
@@ -160,7 +152,19 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
       {respuestas?.map((resp, idx) => {
         const pregunta = questionMap[resp.generic_question_id] || `Pregunta ${idx + 1}`;
         return (
-          <div key={resp.generic_question_id} style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fafafa' }}>
+          <div 
+            key={resp.generic_question_id} 
+            style={{ 
+              marginBottom: '1.5rem', 
+              padding: '1rem', 
+              border: '1px solid #ddd', 
+              borderRadius: '4px', 
+              backgroundColor: '#fafafa',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
+            onClick={() => onEditQuestion(idx)}
+          >
             <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', color: '#333' }}>
               {idx + 1}. {pregunta}
             </div>
@@ -189,7 +193,7 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
             cursor: saving ? 'not-allowed' : 'pointer',
           }}
         >
-          Volver atrás
+          Volver al resumen
         </button>
         <button
           onClick={handleConfirm}

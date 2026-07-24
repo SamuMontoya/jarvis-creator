@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 
-function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onComplete }) {
+function QuestionForm({ 
+  idea_id, 
+  currentQuestionIndex, 
+  onNext, 
+  onPrevious, 
+  onComplete,
+  editMode = false,
+  onEditComplete 
+}) {
   const [respuesta, setRespuesta] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -49,6 +57,7 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onCom
   const saveAndNavigate = async (direction) => {
     setError(null);
 
+    // Validate only for "next" direction
     if (direction === 'next' && (!respuesta || respuesta.trim() === '')) {
       setError('La respuesta no puede estar vacía');
       return;
@@ -73,12 +82,21 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onCom
 
       if (direction === 'next') {
         if (isLastQuestion) {
-          onComplete();
+          if (editMode) {
+            onEditComplete(currentQuestionIndex + 1); // go to resumen
+          } else {
+            onComplete();
+          }
         } else {
           onNext(currentQuestionIndex + 1);
         }
       } else if (direction === 'previous') {
-        onPrevious(currentQuestionIndex - 1);
+        if (editMode) {
+          // In edit mode, "previous" goes back to resumen
+          onEditComplete('back');
+        } else {
+          onPrevious(currentQuestionIndex - 1);
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -172,7 +190,7 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onCom
             cursor: loading || isFirstQuestion ? 'not-allowed' : 'pointer',
           }}
         >
-          Anterior
+          {editMode ? 'Volver al resumen' : 'Anterior'}
         </button>
         <button
           type="button"
@@ -182,14 +200,15 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onCom
             flex: 1,
             padding: '0.75rem 1.5rem',
             fontSize: '1rem',
-            backgroundColor: loading || isEmpty || !currentQuestion?.id ? '#ccc' : isLastQuestion ? '#dc3545' : '#28a745',
+            backgroundColor: loading || isEmpty || !currentQuestion?.id ? '#ccc' : 
+              isLastQuestion ? (editMode ? '#007bff' : '#dc3545') : '#28a745',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
             cursor: loading || isEmpty || !currentQuestion?.id ? 'not-allowed' : 'pointer',
           }}
         >
-          {loading ? 'Guardando...' : isLastQuestion ? 'Ir a Resumen' : 'Siguiente'}
+          {loading ? 'Guardando...' : isLastQuestion ? (editMode ? 'Ir al resumen' : 'Ir a Resumen') : 'Siguiente'}
         </button>
       </div>
     </div>
