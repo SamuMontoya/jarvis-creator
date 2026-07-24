@@ -8,13 +8,22 @@ function ResumenForm({ idea_id, onComplete, onBack, onEditQuestion }) {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  const storageKey = `jarvis_respuestas_${idea_id}`;
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const storageKey = `jarvis_respuestas_${idea_id}`;
+        // Clean up other idea localStorage keys
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('jarvis_respuestas_') && key !== storageKey) {
+            localStorage.removeItem(key);
+          }
+        }
+
         const storedAnswers = JSON.parse(localStorage.getItem(storageKey) || '{}');
         
         const [ideaResponse, questionsResponse] = await Promise.all([
@@ -61,7 +70,6 @@ function ResumenForm({ idea_id, onComplete, onBack, onEditQuestion }) {
     setError(null);
 
     try {
-      const storageKey = `jarvis_respuestas_${idea_id}`;
       const storedAnswers = JSON.parse(localStorage.getItem(storageKey) || '{}');
       
       if (Object.keys(storedAnswers).length === 0) {
@@ -181,21 +189,6 @@ function ResumenForm({ idea_id, onComplete, onBack, onEditQuestion }) {
 
       <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '2rem' }}>
         <button
-          onClick={onBack}
-          disabled={saving}
-          style={{
-            padding: '0.75rem 1.5rem',
-            fontSize: '1rem',
-            backgroundColor: saving ? '#ccc' : '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: saving ? 'not-allowed' : 'pointer',
-          }}
-        >
-          Volver al resumen
-        </button>
-        <button
           onClick={handleConfirm}
           disabled={saving}
           style={{
@@ -208,7 +201,7 @@ function ResumenForm({ idea_id, onComplete, onBack, onEditQuestion }) {
             cursor: saving ? 'not-allowed' : 'pointer',
           }}
         >
-          {saving ? 'Guardando...' : 'Confirmar y enviar'}
+          {saving ? 'Guardando...' : 'Guardar'}
         </button>
       </div>
     </div>
