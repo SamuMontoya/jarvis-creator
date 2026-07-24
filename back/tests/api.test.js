@@ -276,3 +276,135 @@ describe('POST /api/respuestas', () => {
     expect(res.body.respuesta.respuesta).toBe('Trimmed answer');
   });
 });
+
+describe('GET /api/ideas/:id/respuestas', () => {
+  it('should return 200 with respuestas array for valid idea id', async () => {
+    // First create some responses
+    await request(app)
+      .post('/api/respuestas')
+      .send({
+        idea_id: testIdeaId,
+        generic_question_id: testQuestionIds[0],
+        respuesta: 'Answer 1'
+      });
+    await request(app)
+      .post('/api/respuestas')
+      .send({
+        idea_id: testIdeaId,
+        generic_question_id: testQuestionIds[1],
+        respuesta: 'Answer 2'
+      });
+
+    const res = await request(app).get(`/api/ideas/${testIdeaId}/respuestas`);
+    
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(Array.isArray(res.body.respuestas)).toBe(true);
+    expect(res.body.respuestas.length).toBe(2);
+
+    // Verify each respuesta has required fields
+    for (const respuesta of res.body.respuestas) {
+      expect(respuesta).toHaveProperty('id');
+      expect(respuesta).toHaveProperty('idea_id');
+      expect(respuesta).toHaveProperty('generic_question_id');
+      expect(respuesta).toHaveProperty('respuesta');
+      expect(respuesta).toHaveProperty('created_at');
+      expect(respuesta.idea_id).toBe(testIdeaId);
+    }
+  });
+
+  it('should return 404 for non-existent idea id', async () => {
+    const fakeId = '00000000-0000-0000-0000-000000000000';
+    const res = await request(app).get(`/api/ideas/${fakeId}/respuestas`);
+    
+    expect(res.status).toBe(404);
+    expect(res.body.status).toBe('error');
+    expect(res.body.message).toContain('no encontrada');
+  });
+
+  it('should return empty array for idea with no respuestas', async () => {
+    // Create a new idea with no responses
+    const { data: newIdea } = await supabase
+      .from('ideas')
+      .insert({ texto_idea: 'Idea without responses' })
+      .select()
+      .single();
+
+    const res = await request(app).get(`/api/ideas/${newIdea.id}/respuestas`);
+    
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(Array.isArray(res.body.respuestas)).toBe(true);
+    expect(res.body.respuestas.length).toBe(0);
+
+    // Cleanup
+    await supabase.from('ideas').delete().eq('id', newIdea.id);
+  });
+
+  it('should include generic_question data in response', async () => {
+    const res = await request(app)
+      .post('/api/respuestas')
+      .send({
+        idea_id: testIdeaId,
+        generic_question_id: testQuestionIds[0],
+        respuesta: 'Test with question data'
+      });
+
+    const getRes = await request(app).get(`/api/ideas/${testIdeaId}/respuestas`);
+    
+    expect(getRes.status).toBe(200);
+    const respuesta = getRes.body.respuestas[0];
+    expect(respuesta).toHaveProperty('generic_questions');
+    expect(respuesta.generic_questions).toHaveProperty('pregunta');
+    expect(respuesta.generic_questions).toHaveProperty('orden');
+  });
+});
+
+describe('Integration: idea -> respuestas -> GET', () => {
+  it('full flow: create idea, create 2 respuestas, retrieve both', async () => {
+    // 1. Create idea
+    const createIdeaRes = await request(app)
+      .post('/api/ideas')
+      .send({ texto_idea: 'Integration test idea' });
+    
+    expect(createIdeaRes.status).toBe(201);
+    const ideaId = createIdeaRes.body.idea.id;
+
+    // 2. Create 2 respuestas
+    const q1 = testQuestionIds[0];
+    const q2 = testQuestionIds[1];
+
+    const r1 = await request(app)
+      .post('/api/respuestas')
+      .send({ idea_id: ideaId, generic_question_id: q1, respuesta: 'Integration answer 1' });
+    expect(r1.status).toBe(201);
+
+    const r2 = await request(app)
+      .post('/api/respuestas')
+      .send({ idea_id: ideaId, generic_question_id: q2, respuesta: 'Integration answer 2' });
+    expect(r2.status).toBe(201);
+
+    // 3. GET /api/ideas/:id/respuestas
+    const getRes = await request(app).get(`/api/ideas/${ideaId}/respuestas`);
+    
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.status).toBe('ok');
+    expect(getRes.body.respuestas.length).toBe(2);
+
+    // 4. Verify data completeness
+    const respuestas = getRes.body.respuestas;
+    const questionIds = respuestas.map(r => r.generic_question_id);
+    expect(questionIds).toContain(q1);
+    expect(questionIds).toContain(q2);
+
+    for (const r of respuestas) {
+      expect(r.idea_id).toBe(ideaId);
+      expect(r.respuesta).toMatch(/Integration answer [12]/);
+      expect(r).toHaveProperty('created_at');
+      expect(r.generic_questions).toHaveProperty('pregunta');
+    }
+
+    // Cleanup
+    await supabase.from('ideas').delete().eq('id', ideaId);
+  });
+});
