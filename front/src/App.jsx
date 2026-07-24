@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import IdeaForm from './IdeaForm';
 import QuestionForm from './QuestionForm';
+import ResumenForm from './ResumenForm';
 import './App.css';
 
 function App() {
@@ -18,8 +19,11 @@ function App() {
     setCurrentQuestionIndex(prev => prev + 1);
   };
 
-  const handleComplete = () => {
-    alert('¡Todas las preguntas respondidas! Idea ID: ' + ideaId);
+  const handleQuestionsComplete = () => {
+    setStage('resumen');
+  };
+
+  const handleRestart = () => {
     setStage('idea');
     setIdeaId(null);
     setCurrentQuestionIndex(0);
@@ -40,19 +44,38 @@ function App() {
     );
   }
 
+  if (stage === 'questions') {
+    return (
+      <>
+        <section id="center">
+          <div className="hero">
+            <h1>JARVIS Creator - Preguntas</h1>
+          </div>
+        </section>
+        <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+          <QuestionForm
+            idea_id={ideaId}
+            currentQuestionIndex={currentQuestionIndex}
+            onNext={handleNext}
+            onComplete={handleQuestionsComplete}
+          />
+        </main>
+      </>
+    );
+  }
+
   return (
     <>
       <section id="center">
         <div className="hero">
-          <h1>JARVIS Creator - Preguntas</h1>
+          <h1>JARVIS Creator - Resumen</h1>
         </div>
       </section>
       <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
-        <QuestionForm
+        <ResumenForm
           idea_id={ideaId}
-          currentQuestionIndex={currentQuestionIndex}
-          onNext={handleNext}
-          onComplete={handleComplete}
+          onComplete={handleRestart}
+          onBack={handleRestart}
         />
       </main>
     </>

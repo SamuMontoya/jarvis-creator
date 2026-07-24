@@ -91,6 +91,40 @@ app.get('/api/ideas/:id', async (req, res) => {
   }
 });
 
+app.patch('/api/ideas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ status: 'error', message: 'id de idea es requerido' });
+    }
+
+    if (!estado) {
+      return res.status(400).json({ status: 'error', message: 'estado es requerido' });
+    }
+
+    const { data, error } = await supabase
+      .from('ideas')
+      .update({ estado })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ status: 'error', message: error.message });
+    }
+
+    if (!data) {
+      return res.status(404).json({ status: 'error', message: 'Idea no encontrada' });
+    }
+
+    res.json({ status: 'ok', idea: data });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 app.post('/api/respuestas', async (req, res) => {
   try {
     const { idea_id, generic_question_id, respuesta } = req.body;
