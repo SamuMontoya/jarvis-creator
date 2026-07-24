@@ -41,6 +41,20 @@ function QuestionForm({
   const isFirstQuestion = currentQuestionIndex === 0;
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
 
+  // Debounced auto-save to localStorage
+  useEffect(() => {
+    if (!respuesta || !currentQuestion?.id) return;
+    
+    const storageKey = `jarvis_respuestas_${idea_id}`;
+    const timer = setTimeout(() => {
+      const stored = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      stored[currentQuestion.id] = respuesta.trim();
+      localStorage.setItem(storageKey, JSON.stringify(stored));
+    }, 1000); // 1 second debounce
+    
+    return () => clearTimeout(timer);
+  }, [respuesta, currentQuestion?.id, idea_id]);
+
   // Load answer from localStorage when question changes
   useEffect(() => {
     if (currentQuestion?.id) {
