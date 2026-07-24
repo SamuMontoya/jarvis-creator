@@ -8,6 +8,7 @@ function App() {
   const [stage, setStage] = useState('idea');
   const [ideaId, setIdeaId] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [questions, setQuestions] = useState([]);
 
   const handleIdeaCreated = (id) => {
     setIdeaId(id);
@@ -31,6 +32,11 @@ function App() {
     setStage('idea');
     setIdeaId(null);
     setCurrentQuestionIndex(0);
+  };
+
+  const handleBackFromResumen = () => {
+    setStage('questions');
+    setCurrentQuestionIndex(questions.length > 0 ? questions.length - 1 : 0);
   };
 
   if (stage === 'idea') {
@@ -80,7 +86,7 @@ function App() {
         <ResumenForm
           idea_id={ideaId}
           onComplete={handleRestart}
-          onBack={handleRestart}
+          onBack={handleBackFromResumen}
         />
       </main>
     </>

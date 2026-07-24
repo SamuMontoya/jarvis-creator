@@ -36,7 +36,7 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onCom
   const saveAndNavigate = async (direction) => {
     setError(null);
 
-    if (!respuesta.trim()) {
+    if (direction === 'next' && (!respuesta || respuesta.trim() === '')) {
       setError('La respuesta no puede estar vacía');
       return;
     }
@@ -49,14 +49,11 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onCom
     setLoading(true);
 
     try {
-      // Get existing answers from localStorage (per idea_id)
       const storageKey = `jarvis_respuestas_${idea_id}`;
       const stored = JSON.parse(localStorage.getItem(storageKey) || '{}');
       
-      // Add new answer
       stored[currentQuestion.id] = respuesta.trim();
       
-      // Save back to localStorage
       localStorage.setItem(storageKey, JSON.stringify(stored));
 
       setRespuesta('');
@@ -77,13 +74,11 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onCom
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     saveAndNavigate('next');
   };
 
-  const handlePrevious = (e) => {
-    e.preventDefault();
+  const handlePrevious = () => {
     saveAndNavigate('previous');
   };
 
@@ -110,6 +105,8 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onCom
       </div>
     );
   }
+
+  const isEmpty = !respuesta || respuesta.trim() === '';
 
   return (
     <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem' }}>
@@ -150,16 +147,16 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onCom
         <button
           type="button"
           onClick={handlePrevious}
-          disabled={loading || isFirstQuestion || !respuesta.trim() || !currentQuestion?.id}
+          disabled={loading || isFirstQuestion}
           style={{
             flex: 1,
             padding: '0.75rem 1.5rem',
             fontSize: '1rem',
-            backgroundColor: loading || isFirstQuestion || !respuesta.trim() || !currentQuestion?.id ? '#ccc' : '#6c757d',
+            backgroundColor: loading || isFirstQuestion ? '#ccc' : '#6c757d',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: loading || isFirstQuestion || !respuesta.trim() || !currentQuestion?.id ? 'not-allowed' : 'pointer',
+            cursor: loading || isFirstQuestion ? 'not-allowed' : 'pointer',
           }}
         >
           Anterior
@@ -167,16 +164,16 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onCom
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={loading || !respuesta.trim() || !currentQuestion?.id}
+          disabled={loading || isEmpty || !currentQuestion?.id}
           style={{
             flex: 1,
             padding: '0.75rem 1.5rem',
             fontSize: '1rem',
-            backgroundColor: loading || !respuesta.trim() || !currentQuestion?.id ? '#ccc' : isLastQuestion ? '#dc3545' : '#28a745',
+            backgroundColor: loading || isEmpty || !currentQuestion?.id ? '#ccc' : isLastQuestion ? '#dc3545' : '#28a745',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: loading || !respuesta.trim() || !currentQuestion?.id ? 'not-allowed' : 'pointer',
+            cursor: loading || isEmpty || !currentQuestion?.id ? 'not-allowed' : 'pointer',
           }}
         >
           {loading ? 'Guardando...' : isLastQuestion ? 'Ir a Resumen' : 'Siguiente'}
