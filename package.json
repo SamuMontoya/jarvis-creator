@@ -1,0 +1,16 @@
+{
+  "name": "jarvis-creator",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "front",
+    "back"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=front\" \"npm run dev --workspace=back\"",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
