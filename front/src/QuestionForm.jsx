@@ -33,6 +33,19 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onCom
   const isFirstQuestion = currentQuestionIndex === 0;
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
 
+  // Load answer from localStorage when question changes
+  useEffect(() => {
+    if (currentQuestion?.id) {
+      const storageKey = `jarvis_respuestas_${idea_id}`;
+      const stored = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      if (stored[currentQuestion.id]) {
+        setRespuesta(stored[currentQuestion.id]);
+      } else {
+        setRespuesta('');
+      }
+    }
+  }, [currentQuestionIndex, currentQuestion?.id, idea_id]);
+
   const saveAndNavigate = async (direction) => {
     setError(null);
 
