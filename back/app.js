@@ -38,7 +38,7 @@ app.get('/api/ideas', async (req, res) => {
     const { data, error } = await supabase
       .from('ideas')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('updated_at', { ascending: false });
 
     if (error) {
       return res.status(500).json({ status: 'error', message: error.message });
@@ -137,6 +137,40 @@ app.patch('/api/ideas/:id', async (req, res) => {
     }
 
     res.json({ status: 'ok', idea: data });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+app.delete('/api/ideas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ status: 'error', message: 'id de idea es requerido' });
+    }
+
+    // Delete respuestas first (cascade)
+    const { error: respError } = await supabase
+      .from('respuestas')
+      .delete()
+      .eq('idea_id', id);
+
+    if (respError) {
+      return res.status(500).json({ status: 'error', message: respError.message });
+    }
+
+    // Delete idea
+    const { error: ideaError } = await supabase
+      .from('ideas')
+      .delete()
+      .eq('id', id);
+
+    if (ideaError) {
+      return res.status(500).json({ status: 'error', message: ideaError.message });
+    }
+
+    res.json({ status: 'ok', deleted: true });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
