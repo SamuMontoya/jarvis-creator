@@ -25,6 +25,30 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+app.post('/api/ideas', async (req, res) => {
+  try {
+    const { texto_idea } = req.body;
+
+    if (!texto_idea || typeof texto_idea !== 'string' || texto_idea.trim() === '') {
+      return res.status(400).json({ status: 'error', message: 'texto_idea es requerido y no puede estar vacío' });
+    }
+
+    const { data, error } = await supabase
+      .from('ideas')
+      .insert([{ texto_idea: texto_idea.trim() }])
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ status: 'error', message: error.message });
+    }
+
+    res.status(201).json({ status: 'ok', idea: data });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ status: 'error', message: 'Internal server error' });
