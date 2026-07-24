@@ -30,7 +30,10 @@ const mockFetchQuestions = () => ({
 
 const mockFetchRespuestas = () => ({
   ok: true,
-  json: async () => ({ status: 'ok', respuesta: { id: 'resp-1' } }),
+  json: async () => ({ status: 'ok', respuestas: [
+    { id: 'r1', generic_question_id: 'q1-uuid', respuesta: 'Respuesta 1' },
+    { id: 'r2', generic_question_id: 'q2-uuid', respuesta: 'Respuesta 2' },
+  ]}),
 });
 
 const mockPatchIdea = () => ({
@@ -50,25 +53,26 @@ describe('ResumenForm - Unit Tests', () => {
   });
 
   describe('1. Carga datos al montar', () => {
-    it('debe ejecutar GET /api/ideas/:id y /api/questions al montar', async () => {
+    it('debe ejecutar GET /api/ideas/:id, /api/questions y /api/ideas/:id/respuestas al montar', async () => {
       global.fetch
         .mockResolvedValueOnce(mockFetchIdea())
-        .mockResolvedValueOnce(mockFetchQuestions());
-
-      localStorage.setItem('jarvis_respuestas_test-idea-id', JSON.stringify({}));
+        .mockResolvedValueOnce(mockFetchQuestions())
+        .mockResolvedValueOnce(mockFetchRespuestas());
 
       render(<ResumenForm idea_id="test-idea-id" onComplete={onComplete} onBack={onBack} onEditQuestion={onEditQuestion} />);
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith('http://localhost:3001/api/ideas/test-idea-id');
         expect(global.fetch).toHaveBeenCalledWith('http://localhost:3001/api/questions');
+        expect(global.fetch).toHaveBeenCalledWith('http://localhost:3001/api/ideas/test-idea-id/respuestas');
       });
     });
 
     it('debe limpiar localStorage de otras ideas al cargar', async () => {
       global.fetch
         .mockResolvedValueOnce(mockFetchIdea())
-        .mockResolvedValueOnce(mockFetchQuestions());
+        .mockResolvedValueOnce(mockFetchQuestions())
+        .mockResolvedValueOnce(mockFetchRespuestas());
 
       localStorage.setItem('jarvis_respuestas_test-idea-id', JSON.stringify({ 'q1-uuid': 'answer1' }));
       localStorage.setItem('jarvis_respuestas_otra-idea', JSON.stringify({ 'q2-uuid': 'answer2' }));
@@ -81,20 +85,23 @@ describe('ResumenForm - Unit Tests', () => {
         expect(localStorage.getItem('jarvis_respuestas_tercera')).toBeNull();
       });
       
-      // Current idea should remain
-      expect(localStorage.getItem('jarvis_respuestas_test-idea-id')).not.toBeNull();
+      // Current idea's localStorage should also be removed
+      expect(localStorage.getItem('jarvis_respuestas_test-idea-id')).toBeNull();
     });
 
-    it('debe cargar respuestas desde localStorage y preguntas desde API', async () => {
-      const storedAnswers = {
-        'q1-uuid': 'Mi respuesta 1',
-        'q2-uuid': 'Mi respuesta 2',
-      };
-      localStorage.setItem('jarvis_respuestas_test-idea-id', JSON.stringify(storedAnswers));
-
+    it('debe cargar respuestas desde /api/ideas/:id/respuestas y preguntas desde API', async () => {
+      const mockRespuestas = [
+        { generic_question_id: 'q1-uuid', respuesta: 'Mi respuesta 1' },
+        { generic_question_id: 'q2-uuid', respuesta: 'Mi respuesta 2' },
+      ];
+      
       global.fetch
         .mockResolvedValueOnce(mockFetchIdea())
-        .mockResolvedValueOnce(mockFetchQuestions());
+        .mockResolvedValueOnce(mockFetchQuestions())
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ status: 'ok', respuestas: mockRespuestas }),
+        });
 
       render(<ResumenForm idea_id="test-idea-id" onComplete={onComplete} onBack={onBack} onEditQuestion={onEditQuestion} />);
 
@@ -105,13 +112,15 @@ describe('ResumenForm - Unit Tests', () => {
     });
 
     it('debe mostrar loading mientras carga datos', async () => {
-      let resolveIdea, resolveQuestions;
+      let resolveIdea, resolveQuestions, resolveRespuestas;
       const ideaPromise = new Promise(r => { resolveIdea = r; });
       const questionsPromise = new Promise(r => { resolveQuestions = r; });
+      const respuestasPromise = new Promise(r => { resolveRespuestas = r; });
       
       global.fetch
         .mockImplementationOnce(() => ideaPromise)
-        .mockImplementationOnce(() => questionsPromise);
+        .mockImplementationOnce(() => questionsPromise)
+        .mockImplementationOnce(() => respuestasPromise);
 
       render(<ResumenForm idea_id="test-idea-id" onComplete={onComplete} onBack={onBack} onEditQuestion={onEditQuestion} />);
 
@@ -119,6 +128,10 @@ describe('ResumenForm - Unit Tests', () => {
 
       resolveIdea(mockFetchIdea());
       resolveQuestions(mockFetchQuestions());
+      resolveRespuestas({
+        ok: true,
+        json: async () => ({ status: 'ok', respuestas: [] }),
+      });
       
       await waitFor(() => {
         expect(screen.queryByText(/cargando resumen/i)).not.toBeInTheDocument();
@@ -131,7 +144,11 @@ describe('ResumenForm - Unit Tests', () => {
           ok: false,
           json: async () => ({ message: 'Error al cargar la idea' }),
         })
-        .mockResolvedValueOnce(mockFetchQuestions());
+        .mockResolvedValueOnce(mockFetchQuestions())
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ status: 'ok', respuestas: [] }),
+        });
 
       render(<ResumenForm idea_id="test-idea-id" onComplete={onComplete} onBack={onBack} onEditQuestion={onEditQuestion} />);
 
@@ -143,16 +160,17 @@ describe('ResumenForm - Unit Tests', () => {
 
   describe('2. Click en respuesta navega a edición', () => {
     it('debe llamar onEditQuestion con el índice correcto al hacer click en respuesta', async () => {
-      const storedAnswers = {
-        'q1-uuid': 'Respuesta 1',
-        'q2-uuid': 'Respuesta 2',
-        'q3-uuid': 'Respuesta 3',
-      };
-      localStorage.setItem('jarvis_respuestas_test-idea-id', JSON.stringify(storedAnswers));
-
       global.fetch
         .mockResolvedValueOnce(mockFetchIdea())
-        .mockResolvedValueOnce(mockFetchQuestions());
+        .mockResolvedValueOnce(mockFetchQuestions())
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ status: 'ok', respuestas: [
+            { generic_question_id: 'q1-uuid', respuesta: 'Respuesta 1' },
+            { generic_question_id: 'q2-uuid', respuesta: 'Respuesta 2' },
+            { generic_question_id: 'q3-uuid', respuesta: 'Respuesta 3' },
+          ]}),
+        });
 
       render(<ResumenForm idea_id="test-idea-id" onComplete={onComplete} onBack={onBack} onEditQuestion={onEditQuestion} />);
 
@@ -168,15 +186,16 @@ describe('ResumenForm - Unit Tests', () => {
     });
 
     it('debe renderizar cada respuesta con su pregunta correspondiente', async () => {
-      const storedAnswers = {
-        'q1-uuid': 'Respuesta a pregunta 1',
-        'q3-uuid': 'Respuesta a pregunta 3',
-      };
-      localStorage.setItem('jarvis_respuestas_test-idea-id', JSON.stringify(storedAnswers));
-
       global.fetch
         .mockResolvedValueOnce(mockFetchIdea())
-        .mockResolvedValueOnce(mockFetchQuestions());
+        .mockResolvedValueOnce(mockFetchQuestions())
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ status: 'ok', respuestas: [
+            { generic_question_id: 'q1-uuid', respuesta: 'Respuesta a pregunta 1' },
+            { generic_question_id: 'q3-uuid', respuesta: 'Respuesta a pregunta 3' },
+          ]}),
+        });
 
       render(<ResumenForm idea_id="test-idea-id" onComplete={onComplete} onBack={onBack} onEditQuestion={onEditQuestion} />);
 
@@ -187,20 +206,13 @@ describe('ResumenForm - Unit Tests', () => {
     });
   });
 
-  describe('3. Botón Guardar confirma y guarda en BD', () => {
-    it('debe hacer POST a /api/respuestas para cada respuesta y PATCH a /api/ideas', async () => {
-      const storedAnswers = {
-        'q1-uuid': 'Respuesta 1',
-        'q2-uuid': 'Respuesta 2',
-      };
-      localStorage.setItem('jarvis_respuestas_test-idea-id', JSON.stringify(storedAnswers));
-
+  describe('3. Botón Finalizar confirma y guarda en BD', () => {
+    it('debe hacer PATCH a /api/ideas/:id para cambiar estado a refined', async () => {
       global.fetch
         .mockResolvedValueOnce(mockFetchIdea())
         .mockResolvedValueOnce(mockFetchQuestions())
-        .mockResolvedValueOnce(mockFetchRespuestas()) // POST q1
-        .mockResolvedValueOnce(mockFetchRespuestas()) // POST q2
-        .mockResolvedValueOnce(mockPatchIdea());     // PATCH idea
+        .mockResolvedValueOnce(mockFetchRespuestas())
+        .mockResolvedValueOnce(mockPatchIdea());     // PATCH
 
       render(<ResumenForm idea_id="test-idea-id" onComplete={onComplete} onBack={onBack} onEditQuestion={onEditQuestion} />);
 
@@ -208,24 +220,13 @@ describe('ResumenForm - Unit Tests', () => {
         expect(screen.getByText('Respuesta 1')).toBeInTheDocument();
       });
 
-      await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
+      await userEvent.click(screen.getByRole('button', { name: /finalizar/i }));
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledTimes(5); // GET idea + GET questions + 2 POST + 1 PATCH
+        expect(global.fetch).toHaveBeenCalledTimes(4); // GET idea + GET questions + GET respuestas + PATCH
       });
 
-      // Check POST calls to /api/respuestas
-      const postCalls = global.fetch.mock.calls.filter(call => call[1]?.method === 'POST');
-      expect(postCalls.length).toBe(2);
-      
-      // Verify first POST
-      expect(postCalls[0][0]).toBe('http://localhost:3001/api/respuestas');
-      const body1 = JSON.parse(postCalls[0][1].body);
-      expect(body1.idea_id).toBe('test-idea-id');
-      expect(body1.generic_question_id).toBe('q1-uuid');
-      expect(body1.respuesta).toBe('Respuesta 1');
-
-      // Verify PATCH to /api/ideas
+      // Verify PATCH call
       const patchCalls = global.fetch.mock.calls.filter(call => call[1]?.method === 'PATCH');
       expect(patchCalls.length).toBe(1);
       expect(patchCalls[0][0]).toBe('http://localhost:3001/api/ideas/test-idea-id');
@@ -233,17 +234,14 @@ describe('ResumenForm - Unit Tests', () => {
       expect(patchBody.estado).toBe('refined');
     });
 
-    it('debe limpiar localStorage y llamar onComplete tras guardar exitosamente', async () => {
-      const storedAnswers = {
-        'q1-uuid': 'Respuesta 1',
-      };
-      localStorage.setItem('jarvis_respuestas_test-idea-id', JSON.stringify(storedAnswers));
-
+    it('debe limpiar localStorage y llamar onComplete tras finalizar exitosamente', async () => {
       global.fetch
         .mockResolvedValueOnce(mockFetchIdea())
         .mockResolvedValueOnce(mockFetchQuestions())
         .mockResolvedValueOnce(mockFetchRespuestas())
         .mockResolvedValueOnce(mockPatchIdea());
+
+      localStorage.setItem('jarvis_respuestas_test-idea-id', JSON.stringify({ 'q1-uuid': 'Respuesta 1' }));
 
       render(<ResumenForm idea_id="test-idea-id" onComplete={onComplete} onBack={onBack} onEditQuestion={onEditQuestion} />);
 
@@ -251,7 +249,7 @@ describe('ResumenForm - Unit Tests', () => {
         expect(screen.getByText('Respuesta 1')).toBeInTheDocument();
       });
 
-      await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
+      await userEvent.click(screen.getByRole('button', { name: /finalizar/i }));
 
       await waitFor(() => {
         expect(onComplete).toHaveBeenCalledTimes(1);
@@ -261,15 +259,12 @@ describe('ResumenForm - Unit Tests', () => {
       expect(localStorage.getItem('jarvis_respuestas_test-idea-id')).toBeNull();
     });
 
-    it('debe mostrar botón deshabilitado mientras guarda', async () => {
-      const storedAnswers = { 'q1-uuid': 'Respuesta 1' };
-      localStorage.setItem('jarvis_respuestas_test-idea-id', JSON.stringify(storedAnswers));
-
+    it('debe mostrar botón deshabilitado mientras finaliza', async () => {
       global.fetch
         .mockResolvedValueOnce(mockFetchIdea())
         .mockResolvedValueOnce(mockFetchQuestions())
-        .mockImplementationOnce(() => new Promise(() => {})) // POST never resolves
-        .mockResolvedValueOnce(mockPatchIdea());
+        .mockResolvedValueOnce(mockFetchRespuestas())
+        .mockImplementationOnce(() => new Promise(() => {})) // PATCH never resolves
 
       render(<ResumenForm idea_id="test-idea-id" onComplete={onComplete} onBack={onBack} onEditQuestion={onEditQuestion} />);
 
@@ -277,7 +272,7 @@ describe('ResumenForm - Unit Tests', () => {
         expect(screen.getByText('Respuesta 1')).toBeInTheDocument();
       });
 
-      await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
+      await userEvent.click(screen.getByRole('button', { name: /finalizar/i }));
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /guardando/i })).toBeDisabled();

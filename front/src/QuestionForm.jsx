@@ -41,33 +41,6 @@ function QuestionForm({
   const isFirstQuestion = currentQuestionIndex === 0;
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
 
-  // Debounced auto-save to localStorage
-  useEffect(() => {
-    if (!respuesta || !currentQuestion?.id) return;
-    
-    const storageKey = `jarvis_respuestas_${idea_id}`;
-    const timer = setTimeout(() => {
-      const stored = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      stored[currentQuestion.id] = respuesta.trim();
-      localStorage.setItem(storageKey, JSON.stringify(stored));
-    }, 1000); // 1 second debounce
-    
-    return () => clearTimeout(timer);
-  }, [respuesta, currentQuestion?.id, idea_id]);
-
-  // Load answer from localStorage when question changes
-  useEffect(() => {
-    if (currentQuestion?.id) {
-      const storageKey = `jarvis_respuestas_${idea_id}`;
-      const stored = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      if (stored[currentQuestion.id]) {
-        setRespuesta(stored[currentQuestion.id]);
-      } else {
-        setRespuesta('');
-      }
-    }
-  }, [currentQuestionIndex, currentQuestion?.id, idea_id]);
-
   const saveAndNavigate = async (direction) => {
     setError(null);
 
@@ -85,12 +58,26 @@ function QuestionForm({
     setLoading(true);
 
     try {
-      const storageKey = `jarvis_respuestas_${idea_id}`;
-      const stored = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      
-      stored[currentQuestion.id] = respuesta.trim();
-      
-      localStorage.setItem(storageKey, JSON.stringify(stored));
+      if (direction === 'next') {
+        // POST answer to API
+        const response = await fetch('http://localhost:3001/api/respuestas', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            idea_id,
+            generic_question_id: currentQuestion.id,
+            respuesta: respuesta.trim(),
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || data.error || 'Error al guardar la respuesta');
+        }
+      }
 
       setRespuesta('');
 
@@ -106,7 +93,6 @@ function QuestionForm({
         }
       } else if (direction === 'previous') {
         if (editMode) {
-          // In edit mode, "previous" goes back to resumen
           onEditComplete('back');
         } else {
           onPrevious(currentQuestionIndex - 1);

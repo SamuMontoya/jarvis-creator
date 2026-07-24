@@ -8,33 +8,34 @@ function ResumenForm({ idea_id, onComplete, onBack, onEditQuestion }) {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const storageKey = `jarvis_respuestas_${idea_id}`;
-
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // Clean up other idea localStorage keys (collect keys first to avoid modification during iteration)
+        // Clean up any remaining localStorage keys for other ideas (collect keys first to avoid modification during iteration)
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key.startsWith('jarvis_respuestas_') && key !== storageKey) {
+          if (key && key.startsWith('jarvis_respuestas_') && key !== `jarvis_respuestas_${idea_id}`) {
             keysToRemove.push(key);
           }
         }
         keysToRemove.forEach(key => localStorage.removeItem(key));
-
-        const storedAnswers = JSON.parse(localStorage.getItem(storageKey) || '{}');
         
-        const [ideaResponse, questionsResponse] = await Promise.all([
+        // Also remove current idea's localStorage if exists
+        localStorage.removeItem(`jarvis_respuestas_${idea_id}`);
+        
+        const [ideaResponse, questionsResponse, respuestasResponse] = await Promise.all([
           fetch(`http://localhost:3001/api/ideas/${idea_id}`),
           fetch('http://localhost:3001/api/questions'),
+          fetch(`http://localhost:3001/api/ideas/${idea_id}/respuestas`),
         ]);
 
         const ideaData = await ideaResponse.json();
         const questionsData = await questionsResponse.json();
+        const respuestasData = await respuestasResponse.json();
 
         if (!ideaResponse.ok) {
           throw new Error(ideaData.message || 'Error al cargar la idea');
@@ -44,14 +45,13 @@ function ResumenForm({ idea_id, onComplete, onBack, onEditQuestion }) {
           throw new Error(questionsData.message || 'Error al cargar las preguntas');
         }
 
+        if (!respuestasResponse.ok) {
+          throw new Error(respuestasData.message || 'Error al cargar las respuestas');
+        }
+
         if (ideaData.idea) setIdea(ideaData.idea);
         if (questionsData.questions) setQuestions(questionsData.questions);
-        
-        const respuestasArray = Object.entries(storedAnswers).map(([generic_question_id, respuesta]) => ({
-          generic_question_id,
-          respuesta,
-        }));
-        setRespuestas(respuestasArray);
+        if (respuestasData.respuestas) setRespuestas(respuestasData.respuestas);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -72,34 +72,7 @@ function ResumenForm({ idea_id, onComplete, onBack, onEditQuestion }) {
     setError(null);
 
     try {
-      const storedAnswers = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      
-      if (Object.keys(storedAnswers).length === 0) {
-        throw new Error('No hay respuestas para guardar');
-      }
-
-      for (const [generic_question_id, respuesta] of Object.entries(storedAnswers)) {
-        const response = await fetch('http://localhost:3001/api/respuestas', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            idea_id,
-            generic_question_id,
-            respuesta,
-          }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || `Error al guardar respuesta para pregunta ${generic_question_id}`);
-        }
-      }
-
-      localStorage.removeItem(storageKey);
-
+      // Only update estado to 'refined' - answers are already in DB
       const patchResponse = await fetch(`http://localhost:3001/api/ideas/${idea_id}`, {
         method: 'PATCH',
         headers: {
@@ -113,6 +86,9 @@ function ResumenForm({ idea_id, onComplete, onBack, onEditQuestion }) {
       if (!patchResponse.ok) {
         throw new Error(patchData.message || 'Error al actualizar estado de la idea');
       }
+
+      // Clean up any remaining localStorage
+      localStorage.removeItem(`jarvis_respuestas_${idea_id}`);
 
       onComplete();
     } catch (err) {
@@ -203,7 +179,7 @@ function ResumenForm({ idea_id, onComplete, onBack, onEditQuestion }) {
             cursor: saving ? 'not-allowed' : 'pointer',
           }}
         >
-          {saving ? 'Guardando...' : 'Guardar'}
+          {saving ? 'Guardando...' : 'Finalizar'}
         </button>
       </div>
     </div>
