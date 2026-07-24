@@ -33,6 +33,23 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+app.get('/api/ideas', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('ideas')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ status: 'error', message: error.message });
+    }
+
+    res.json({ status: 'ok', ideas: data || [] });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 app.post('/api/ideas', async (req, res) => {
   try {
     const { texto_idea } = req.body;

@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import IdeaForm from './IdeaForm';
 import QuestionForm from './QuestionForm';
 import ResumenForm from './ResumenForm';
+import MyIdeas from './MyIdeas';
 import './App.css';
 
 function App() {
-  const [stage, setStage] = useState('idea');
+  const [stage, setStage] = useState('ideas');
   const [ideaId, setIdeaId] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [questions, setQuestions] = useState([]);
@@ -65,6 +66,21 @@ function App() {
     setCurrentQuestionIndex(0);
   };
 
+  const handleNewIdea = () => {
+    setStage('idea');
+  };
+
+  const handleContinueIdea = (idea) => {
+    setIdeaId(idea.id);
+    // If idea is completed, go to resumen; otherwise go to questions
+    if (idea.estado === 'refined') {
+      setStage('resumen');
+    } else {
+      setStage('questions');
+      setCurrentQuestionIndex(0);
+    }
+  };
+
   const handleNext = () => {
     setCurrentQuestionIndex(prev => prev + 1);
   };
@@ -78,7 +94,7 @@ function App() {
   };
 
   const handleRestart = () => {
-    setStage('idea');
+    setStage('ideas');
     setIdeaId(null);
     setCurrentQuestionIndex(0);
     setIdeaText('');
@@ -128,6 +144,17 @@ function App() {
       </div>
     </section>
   );
+
+  if (stage === 'ideas') {
+    return (
+      <>
+        {renderHeader()}
+        <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+          <MyIdeas onNewIdea={handleNewIdea} onContinueIdea={handleContinueIdea} />
+        </main>
+      </>
+    );
+  }
 
   if (stage === 'idea') {
     return (
