@@ -19,6 +19,10 @@ function App() {
     setCurrentQuestionIndex(prev => prev + 1);
   };
 
+  const handlePrevious = () => {
+    setCurrentQuestionIndex(prev => Math.max(0, prev - 1));
+  };
+
   const handleQuestionsComplete = () => {
     setStage('resumen');
   };
@@ -57,6 +61,7 @@ function App() {
             idea_id={ideaId}
             currentQuestionIndex={currentQuestionIndex}
             onNext={handleNext}
+            onPrevious={handlePrevious}
             onComplete={handleQuestionsComplete}
           />
         </main>

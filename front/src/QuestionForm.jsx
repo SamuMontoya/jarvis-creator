@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-function QuestionForm({ idea_id, currentQuestionIndex, onNext, onComplete }) {
+function QuestionForm({ idea_id, currentQuestionIndex, onNext, onPrevious, onComplete }) {
   const [respuesta, setRespuesta] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -30,10 +30,10 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onComplete }) {
   }, []);
 
   const currentQuestion = questions[currentQuestionIndex];
+  const isFirstQuestion = currentQuestionIndex === 0;
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const saveAndNavigate = async (direction) => {
     setError(null);
 
     if (!respuesta.trim()) {
@@ -61,16 +61,30 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onComplete }) {
 
       setRespuesta('');
 
-      if (isLastQuestion) {
-        onComplete();
-      } else {
-        onNext();
+      if (direction === 'next') {
+        if (isLastQuestion) {
+          onComplete();
+        } else {
+          onNext(currentQuestionIndex + 1);
+        }
+      } else if (direction === 'previous') {
+        onPrevious(currentQuestionIndex - 1);
       }
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    saveAndNavigate('next');
+  };
+
+  const handlePrevious = (e) => {
+    e.preventDefault();
+    saveAndNavigate('previous');
   };
 
   if (loadingQuestions) {
@@ -98,7 +112,7 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onComplete }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem' }}>
+    <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem' }}>
       <div style={{ marginBottom: '1.5rem', color: '#666', fontSize: '0.9rem' }}>
         Pregunta {currentQuestionIndex + 1} de {questions.length}
       </div>
@@ -132,24 +146,43 @@ function QuestionForm({ idea_id, currentQuestionIndex, onNext, onComplete }) {
         disabled={loading}
       />
 
-      <button
-        type="submit"
-        disabled={loading || !respuesta.trim() || !currentQuestion?.id}
-        style={{
-          marginTop: '1rem',
-          padding: '0.75rem 1.5rem',
-          fontSize: '1rem',
-          backgroundColor: loading || !respuesta.trim() || !currentQuestion?.id ? '#ccc' : '#28a745',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: loading || !respuesta.trim() || !currentQuestion?.id ? 'not-allowed' : 'pointer',
-          width: '100%',
-        }}
-      >
-        {loading ? 'Guardando...' : isLastQuestion ? 'Finalizar' : 'Siguiente'}
-      </button>
-    </form>
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+        <button
+          type="button"
+          onClick={handlePrevious}
+          disabled={loading || isFirstQuestion || !respuesta.trim() || !currentQuestion?.id}
+          style={{
+            flex: 1,
+            padding: '0.75rem 1.5rem',
+            fontSize: '1rem',
+            backgroundColor: loading || isFirstQuestion || !respuesta.trim() || !currentQuestion?.id ? '#ccc' : '#6c757d',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: loading || isFirstQuestion || !respuesta.trim() || !currentQuestion?.id ? 'not-allowed' : 'pointer',
+          }}
+        >
+          Anterior
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={loading || !respuesta.trim() || !currentQuestion?.id}
+          style={{
+            flex: 1,
+            padding: '0.75rem 1.5rem',
+            fontSize: '1rem',
+            backgroundColor: loading || !respuesta.trim() || !currentQuestion?.id ? '#ccc' : isLastQuestion ? '#dc3545' : '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: loading || !respuesta.trim() || !currentQuestion?.id ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {loading ? 'Guardando...' : isLastQuestion ? 'Ir a Resumen' : 'Siguiente'}
+        </button>
+      </div>
+    </div>
   );
 }
 

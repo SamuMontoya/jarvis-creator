@@ -195,7 +195,7 @@ describe('QuestionForm - Unit Tests', () => {
       // Answer question 5 (last) - should call onComplete
       rerender(<QuestionForm idea_id="test-idea-id" currentQuestionIndex={4} onNext={onNext} onComplete={onComplete} />);
       await userEvent.type(screen.getByPlaceholderText('Tu respuesta aquí'), 'Respuesta 5');
-      await userEvent.click(screen.getByRole('button', { name: /finalizar/i }));
+      await userEvent.click(screen.getByRole('button', { name: /ir a resumen/i }));
 
       await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
       expect(onNext).toHaveBeenCalledTimes(4);
@@ -228,7 +228,7 @@ describe('QuestionForm - Unit Tests', () => {
 
       for (let i = 0; i < 5; i++) {
         await userEvent.type(screen.getByPlaceholderText('Tu respuesta aquí'), `Respuesta ${i + 1}`);
-        await userEvent.click(screen.getByRole('button', { name: i === 4 ? /finalizar/i : /siguiente/i }));
+        await userEvent.click(screen.getByRole('button', { name: i === 4 ? /ir a resumen/i : /siguiente/i }));
 
         await waitFor(() => {
           const stored = JSON.parse(localStorage.getItem('jarvis_respuestas_test-idea-id') || '{}');
