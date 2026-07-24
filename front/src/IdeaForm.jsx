@@ -1,10 +1,9 @@
 import { useState } from 'react';
 
-function IdeaForm() {
+function IdeaForm({ onIdeaCreated }) {
   const [texto_idea, setTextoIdea] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [ideaId, setIdeaId] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,8 +31,8 @@ function IdeaForm() {
         throw new Error(data.error || 'Error al crear la idea');
       }
 
-      setIdeaId(data.idea_id);
       setTextoIdea('');
+      onIdeaCreated?.(data.idea.id);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -80,11 +79,6 @@ function IdeaForm() {
       >
         {loading ? 'Enviando...' : 'Enviar'}
       </button>
-      {ideaId && (
-        <div style={{ marginTop: '1rem', padding: '0.5rem', backgroundColor: '#e8f5e9', borderRadius: '4px' }}>
-          Idea creada con ID: <strong>{ideaId}</strong>
-        </div>
-      )}
     </form>
   );
 }
