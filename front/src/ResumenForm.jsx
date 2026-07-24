@@ -16,13 +16,15 @@ function ResumenForm({ idea_id, onComplete, onBack, onEditQuestion }) {
       setError(null);
 
       try {
-        // Clean up other idea localStorage keys
+        // Clean up other idea localStorage keys (collect keys first to avoid modification during iteration)
+        const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && key.startsWith('jarvis_respuestas_') && key !== storageKey) {
-            localStorage.removeItem(key);
+            keysToRemove.push(key);
           }
         }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
 
         const storedAnswers = JSON.parse(localStorage.getItem(storageKey) || '{}');
         

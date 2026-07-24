@@ -241,4 +241,162 @@ describe('QuestionForm - Unit Tests', () => {
       }
     });
   });
+
+  describe('4. Modo edición - editMode', () => {
+    const onEditComplete = vi.fn();
+
+    beforeEach(() => {
+      onEditComplete.mockClear();
+    });
+
+    it('debe cargar respuesta existente de localStorage en modo edición', async () => {
+      // Pre-populate localStorage
+      localStorage.setItem('jarvis_respuestas_test-idea-id', JSON.stringify({
+        'q3-uuid': 'Respuesta original',
+      }));
+
+      global.fetch.mockResolvedValueOnce(mockFetchQuestions());
+
+      render(<QuestionForm 
+        idea_id="test-idea-id" 
+        currentQuestionIndex={2} 
+        onNext={onNext} 
+        onComplete={onComplete}
+        editMode={true}
+        onEditComplete={onEditComplete}
+      />);
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Tu respuesta aquí')).toHaveValue('Respuesta original');
+      });
+    });
+
+    it('en editMode: botón "Anterior" debe decir "Volver al resumen"', async () => {
+      global.fetch.mockResolvedValueOnce(mockFetchQuestions());
+
+      render(<QuestionForm 
+        idea_id="test-idea-id" 
+        currentQuestionIndex={1} 
+        onNext={onNext} 
+        onComplete={onComplete}
+        editMode={true}
+        onEditComplete={onEditComplete}
+      />);
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Tu respuesta aquí')).toBeInTheDocument();
+      });
+
+      const prevButton = screen.getByRole('button', { name: /volver al resumen/i });
+      expect(prevButton).toBeInTheDocument();
+    });
+
+    it('en editMode: botón "Siguiente" debe decir "Ir al resumen" en última pregunta', async () => {
+      global.fetch.mockResolvedValueOnce(mockFetchQuestions());
+
+      render(<QuestionForm 
+        idea_id="test-idea-id" 
+        currentQuestionIndex={4} 
+        onNext={onNext} 
+        onComplete={onComplete}
+        editMode={true}
+        onEditComplete={onEditComplete}
+      />);
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Tu respuesta aquí')).toBeInTheDocument();
+      });
+
+      const nextButton = screen.getByRole('button', { name: /ir al resumen/i });
+      expect(nextButton).toBeInTheDocument();
+    });
+
+    it('en editMode: click en "Volver al resumen" debe llamar onEditComplete("back")', async () => {
+      global.fetch.mockResolvedValueOnce(mockFetchQuestions());
+
+      render(<QuestionForm 
+        idea_id="test-idea-id" 
+        currentQuestionIndex={1} 
+        onNext={onNext} 
+        onComplete={onComplete}
+        editMode={true}
+        onEditComplete={onEditComplete}
+      />);
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Tu respuesta aquí')).toBeInTheDocument();
+      });
+
+      const prevButton = screen.getByRole('button', { name: /volver al resumen/i });
+      await userEvent.click(prevButton);
+
+      await waitFor(() => {
+        expect(onEditComplete).toHaveBeenCalledWith('back');
+      });
+    });
+
+    it('en editMode: editar respuesta y click "Ir al resumen" debe actualizar localStorage y llamar onEditComplete', async () => {
+      // Pre-populate localStorage
+      localStorage.setItem('jarvis_respuestas_test-idea-id', JSON.stringify({
+        'q5-uuid': 'Respuesta original',
+      }));
+
+      global.fetch.mockResolvedValueOnce(mockFetchQuestions());
+
+      render(<QuestionForm 
+        idea_id="test-idea-id" 
+        currentQuestionIndex={4} 
+        onNext={onNext} 
+        onComplete={onComplete}
+        editMode={true}
+        onEditComplete={onEditComplete}
+      />);
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Tu respuesta aquí')).toHaveValue('Respuesta original');
+      });
+
+      // Edit the answer
+      const textarea = screen.getByPlaceholderText('Tu respuesta aquí');
+      await userEvent.clear(textarea);
+      await userEvent.type(textarea, 'Respuesta editada');
+
+      // Click "Ir al resumen" (last question)
+      const nextButton = screen.getByRole('button', { name: /ir al resumen/i });
+      await userEvent.click(nextButton);
+
+      await waitFor(() => {
+        expect(onEditComplete).toHaveBeenCalledWith(5); // currentQuestionIndex + 1
+      });
+
+      // Verify localStorage was updated
+      const stored = JSON.parse(localStorage.getItem('jarvis_respuestas_test-idea-id') || '{}');
+      expect(stored['q5-uuid']).toBe('Respuesta editada');
+    });
+
+    it('en editMode: botón "Volver al resumen" NO debe requerir respuesta no vacía', async () => {
+      global.fetch.mockResolvedValueOnce(mockFetchQuestions());
+
+      render(<QuestionForm 
+        idea_id="test-idea-id" 
+        currentQuestionIndex={1} 
+        onNext={onNext} 
+        onComplete={onComplete}
+        editMode={true}
+        onEditComplete={onEditComplete}
+      />);
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Tu respuesta aquí')).toBeInTheDocument();
+      });
+
+      // Don't type anything, just click "Volver al resumen"
+      const prevButton = screen.getByRole('button', { name: /volver al resumen/i });
+      await userEvent.click(prevButton);
+
+      await waitFor(() => {
+        expect(onEditComplete).toHaveBeenCalledWith('back');
+      });
+    });
+  });
 });
