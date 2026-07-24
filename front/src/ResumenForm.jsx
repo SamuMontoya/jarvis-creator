@@ -14,6 +14,11 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
       setError(null);
 
       try {
+        // Get answers from localStorage
+        const storageKey = `jarvis_respuestas_${idea_id}`;
+        const storedAnswers = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        
+        // Fetch idea and questions in parallel
         const [ideaResponse, questionsResponse] = await Promise.all([
           fetch(`http://localhost:3001/api/ideas/${idea_id}`),
           fetch('http://localhost:3001/api/questions'),
@@ -31,8 +36,14 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
         }
 
         if (ideaData.idea) setIdea(ideaData.idea);
-        if (ideaData.idea?.respuestas) setRespuestas(ideaData.idea.respuestas);
         if (questionsData.questions) setQuestions(questionsData.questions);
+        
+        // Convert localStorage object to array format expected by UI
+        const respuestasArray = Object.entries(storedAnswers).map(([generic_question_id, respuesta]) => ({
+          generic_question_id,
+          respuesta,
+        }));
+        setRespuestas(respuestasArray);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -54,7 +65,40 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
     setError(null);
 
     try {
-      const response = await fetch(`http://localhost:3001/api/ideas/${idea_id}`, {
+      // Get answers from localStorage
+      const storageKey = `jarvis_respuestas_${idea_id}`;
+      const storedAnswers = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      
+      if (Object.keys(storedAnswers).length === 0) {
+        throw new Error('No hay respuestas para guardar');
+      }
+
+      // POST all answers to /api/respuestas
+      for (const [generic_question_id, respuesta] of Object.entries(storedAnswers)) {
+        const response = await fetch('http://localhost:3001/api/respuestas', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            idea_id,
+            generic_question_id,
+            respuesta,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || `Error al guardar respuesta para pregunta ${generic_question_id}`);
+        }
+      }
+
+      // Clear localStorage after successful save
+      localStorage.removeItem(storageKey);
+
+      // Update idea state to 'refined'
+      const patchResponse = await fetch(`http://localhost:3001/api/ideas/${idea_id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -62,10 +106,10 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
         body: JSON.stringify({ estado: 'refined' }),
       });
 
-      const data = await response.json();
+      const patchData = await patchResponse.json();
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Error al confirmar la idea');
+      if (!patchResponse.ok) {
+        throw new Error(patchData.message || 'Error al actualizar estado de la idea');
       }
 
       onComplete();
@@ -116,7 +160,7 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
       {respuestas?.map((resp, idx) => {
         const pregunta = questionMap[resp.generic_question_id] || `Pregunta ${idx + 1}`;
         return (
-          <div key={resp.id} style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fafafa' }}>
+          <div key={resp.generic_question_id} style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fafafa' }}>
             <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', color: '#333' }}>
               {idx + 1}. {pregunta}
             </div>
@@ -160,7 +204,7 @@ function ResumenForm({ idea_id, onComplete, onBack }) {
             cursor: saving ? 'not-allowed' : 'pointer',
           }}
         >
-          {saving ? 'Confirmando...' : 'Confirmar y enviar'}
+          {saving ? 'Guardando...' : 'Confirmar y enviar'}
         </button>
       </div>
     </div>
