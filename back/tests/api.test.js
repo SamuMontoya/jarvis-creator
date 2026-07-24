@@ -112,6 +112,73 @@ describe('POST /api/ideas', () => {
   });
 });
 
+describe('GET /api/ideas/:id', () => {
+  it('should return 200 with idea and nested respuestas for valid id', async () => {
+    // Create responses
+    await request(app)
+      .post('/api/respuestas')
+      .send({
+        idea_id: testIdeaId,
+        generic_question_id: testQuestionIds[0],
+        respuesta: 'Answer 1'
+      });
+    await request(app)
+      .post('/api/respuestas')
+      .send({
+        idea_id: testIdeaId,
+        generic_question_id: testQuestionIds[1],
+        respuesta: 'Answer 2'
+      });
+
+    const res = await request(app).get(`/api/ideas/${testIdeaId}`);
+    
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(res.body.idea).toHaveProperty('id');
+    expect(res.body.idea).toHaveProperty('texto_idea');
+    expect(res.body.idea).toHaveProperty('respuestas');
+    expect(Array.isArray(res.body.idea.respuestas)).toBe(true);
+    expect(res.body.idea.respuestas.length).toBe(2);
+    expect(res.body.idea.id).toBe(testIdeaId);
+
+    // Verify each respuesta has required fields
+    for (const respuesta of res.body.idea.respuestas) {
+      expect(respuesta).toHaveProperty('id');
+      expect(respuesta).toHaveProperty('generic_question_id');
+      expect(respuesta).toHaveProperty('respuesta');
+      expect(respuesta).toHaveProperty('created_at');
+      expect(respuesta.generic_questions).toHaveProperty('pregunta');
+    }
+  });
+
+  it('should return 404 for non-existent idea id', async () => {
+    const fakeId = '00000000-0000-0000-0000-000000000000';
+    const res = await request(app).get(`/api/ideas/${fakeId}`);
+    
+    expect(res.status).toBe(404);
+    expect(res.body.status).toBe('error');
+    expect(res.body.message).toContain('no encontrada');
+  });
+
+  it('should return idea with empty respuestas array when no responses', async () => {
+    const { data: newIdea } = await supabase
+      .from('ideas')
+      .insert({ texto_idea: 'Idea without responses' })
+      .select()
+      .single();
+
+    const res = await request(app).get(`/api/ideas/${newIdea.id}`);
+    
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(res.body.idea).toHaveProperty('respuestas');
+    expect(Array.isArray(res.body.idea.respuestas)).toBe(true);
+    expect(res.body.idea.respuestas.length).toBe(0);
+
+    await supabase.from('ideas').delete().eq('id', newIdea.id);
+  });
+});
+
 describe('POST /api/respuestas', () => {
   it('should create a new respuesta', async () => {
     const res = await request(app)

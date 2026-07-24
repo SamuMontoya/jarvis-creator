@@ -48,6 +48,40 @@ app.post('/api/ideas', async (req, res) => {
   }
 });
 
+app.get('/api/ideas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ status: 'error', message: 'id de idea es requerido' });
+    }
+
+    const { data: idea, error: ideaError } = await supabase
+      .from('ideas')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (ideaError || !idea) {
+      return res.status(404).json({ status: 'error', message: 'Idea no encontrada' });
+    }
+
+    const { data: respuestas, error: respError } = await supabase
+      .from('respuestas')
+      .select('*, generic_questions(pregunta, orden)')
+      .eq('idea_id', id)
+      .order('created_at', { ascending: true });
+
+    if (respError) {
+      return res.status(500).json({ status: 'error', message: respError.message });
+    }
+
+    res.json({ status: 'ok', idea: { ...idea, respuestas: respuestas || [] } });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 app.post('/api/respuestas', async (req, res) => {
   try {
     const { idea_id, generic_question_id, respuesta } = req.body;
