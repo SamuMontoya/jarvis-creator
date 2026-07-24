@@ -49,6 +49,26 @@ app.post('/api/ideas', async (req, res) => {
   }
 });
 
+app.get('/api/questions', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('generic_questions')
+      .select('*')
+      .order('orden', { ascending: true });
+
+    if (error) {
+      if (error.code === 'PGRST116' || error.message.includes('Could not find the table')) {
+        return res.json({ status: 'ok', questions: [] });
+      }
+      return res.status(500).json({ status: 'error', message: error.message });
+    }
+
+    res.json({ status: 'ok', questions: data || [] });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ status: 'error', message: 'Internal server error' });
