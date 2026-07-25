@@ -5,8 +5,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "node index.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "npx jest --detectOpenHandles",
+    "test:watch": "npx jest --watch",
+    "test:vitest": "vitest run",
+    "test:vitest:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
@@ -22,7 +24,8 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^2.0.5",
-    "supertest": "^7.0.0",
+    "jest": "^30.4.2",
+    "supertest": "^7.2.2",
     "vitest": "^2.0.5"
   }
 }

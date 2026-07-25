@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import IdeaForm from './IdeaForm';
 import QuestionForm from './QuestionForm';
 import ResumenForm from './ResumenForm';
+import DynamicQuestionForm from './DynamicQuestionForm';
 import MyIdeas from './MyIdeas';
 import './App.css';
 
@@ -9,6 +10,7 @@ function App() {
   const [stage, setStage] = useState('ideas');
   const [ideaId, setIdeaId] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [dynamicQuestionIndex, setDynamicQuestionIndex] = useState(0);
   const [questions, setQuestions] = useState([]);
   const [ideaText, setIdeaText] = useState('');
 
@@ -119,6 +121,15 @@ function App() {
     setCurrentQuestionIndex(questions.length > 0 ? questions.length - 1 : 0);
   };
 
+  const handleStartDynamicQuestions = () => {
+    setDynamicQuestionIndex(0);
+    setStage('dynamic-questions');
+  };
+
+  const handleDynamicQuestionsComplete = () => {
+    setStage('final-resume');
+  };
+
   const renderHeader = () => (
     <section id="center">
       <div className="hero">
@@ -182,6 +193,40 @@ function App() {
             onComplete={handleQuestionsComplete}
             editMode={isEditMode}
             onEditComplete={handleEditComplete}
+          />
+        </main>
+      </>
+    );
+  }
+
+  if (stage === 'dynamic-questions') {
+    return (
+      <>
+        {renderHeader()}
+        <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+          <DynamicQuestionForm
+            idea_id={ideaId}
+            currentQuestionIndex={dynamicQuestionIndex}
+            onNext={setDynamicQuestionIndex}
+            onBack={setDynamicQuestionIndex}
+            onComplete={handleDynamicQuestionsComplete}
+            editMode={false}
+          />
+        </main>
+      </>
+    );
+  }
+
+  if (stage === 'final-resume') {
+    return (
+      <>
+        {renderHeader()}
+        <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+          <ResumenForm
+            idea_id={ideaId}
+            onComplete={handleRestart}
+            onBack={handleStartDynamicQuestions}
+            onEditQuestion={handleEditQuestion}
           />
         </main>
       </>
