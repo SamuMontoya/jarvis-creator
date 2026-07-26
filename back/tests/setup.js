@@ -7,7 +7,7 @@ dotenv.config({ quiet: true });
 // fallbacks keep construction from throwing when no real credentials exist,
 // without overriding a developer's real .env.
 process.env.SUPABASE_URL ||= 'http://supabase.test';
-process.env.SUPABASE_SERVICE_ROLE_KEY ||= 'test-service-role-key';
+process.env.SUPABASE_SECRET_KEY ||= 'sb_secret_test';
 process.env.GROQ_API_KEY ||= 'test-groq-key';
 
 vi.setConfig({ testTimeout: 15000 });
