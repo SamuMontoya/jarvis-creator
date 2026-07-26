@@ -1,214 +1,195 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import QuestionHeader from './components/QuestionHeader';
+import QuestionCard from './components/QuestionCard';
+import Spinner from './components/Spinner';
+import ErrorMessage from './components/ErrorMessage';
+import { useApp } from './context/AppContext';
+import { useToast } from './context/ToastContext';
+import { api } from './api';
+import { ERRORS, SUCCESS, MIN_ANSWER_LENGTH } from './constants';
 
-function QuestionForm({ 
-  idea_id, 
-  currentQuestionIndex, 
-  onNext, 
-  onPrevious, 
-  onComplete,
-  editMode = false,
-  onEditComplete 
-}) {
-  const [respuesta, setRespuesta] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+function QuestionForm({ editMode = false }) {
+  const {
+    ideaId,
+    questionIndex,
+    setQuestionIndex,
+    setTotalQuestions,
+    goToResumen,
+    goToIdeas,
+    finishEditing,
+  } = useApp();
+  const { notify } = useToast();
+
   const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [respuesta, setRespuesta] = useState('');
   const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [questionsError, setQuestionsError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoadingQuestions(true);
+    setQuestionsError(null);
+    try {
+      const [questionsData, respuestasData] = await Promise.all([
+        api.getQuestions(),
+        api.getRespuestas(ideaId),
+      ]);
+
+      const loaded = questionsData.questions || [];
+      setQuestions(loaded);
+      setTotalQuestions(loaded.length);
+
+      const byQuestion = {};
+      (respuestasData.respuestas || []).forEach((r) => {
+        byQuestion[r.generic_question_id] = r.respuesta;
+      });
+      setAnswers(byQuestion);
+    } catch (err) {
+      setQuestionsError(err.message);
+    } finally {
+      setLoadingQuestions(false);
+    }
+  }, [ideaId, setTotalQuestions]);
 
   useEffect(() => {
-    const fetchQuestions = async () => {
-      try {
-        const response = await fetch('http://localhost:3001/api/questions');
-        const data = await response.json();
+    load();
+  }, [load]);
 
-        if (!response.ok) {
-          throw new Error(data.message || data.error || 'Error al cargar preguntas');
-        }
+  const currentQuestion = questions[questionIndex];
 
-        setQuestions(data.questions || []);
-      } catch (err) {
-        setQuestionsError(err.message);
-      } finally {
-        setLoadingQuestions(false);
-      }
-    };
+  // Show the stored answer when revisiting or editing a question.
+  useEffect(() => {
+    setRespuesta(currentQuestion ? answers[currentQuestion.id] ?? '' : '');
+    setError(null);
+  }, [currentQuestion, answers]);
 
-    fetchQuestions();
-  }, []);
+  const trimmed = respuesta.trim();
+  const isTooShort = trimmed.length < MIN_ANSWER_LENGTH;
+  const isFirstQuestion = questionIndex === 0;
+  const isLastQuestion = questionIndex === questions.length - 1;
 
-  const currentQuestion = questions[currentQuestionIndex];
-  const isFirstQuestion = currentQuestionIndex === 0;
-  const isLastQuestion = currentQuestionIndex === questions.length - 1;
-
-  const saveAndNavigate = async (direction) => {
+  const handleNext = async () => {
     setError(null);
 
-    // Validate only for "next" direction
-    if (direction === 'next' && (!respuesta || respuesta.trim() === '')) {
-      setError('La respuesta no puede estar vacía');
-      return;
-    }
+    if (!trimmed) return setError(ERRORS.ANSWER_EMPTY);
+    if (isTooShort) return setError(ERRORS.ANSWER_TOO_SHORT);
 
-    if (!currentQuestion?.id) {
-      setError('No hay pregunta disponible');
-      return;
-    }
-
-    setLoading(true);
-
+    setSaving(true);
     try {
-      if (direction === 'next') {
-        // POST answer to API
-        const response = await fetch('http://localhost:3001/api/respuestas', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            idea_id,
-            generic_question_id: currentQuestion.id,
-            respuesta: respuesta.trim(),
-          }),
-        });
+      await api.saveRespuesta({
+        idea_id: ideaId,
+        generic_question_id: currentQuestion.id,
+        respuesta: trimmed,
+      });
+      setAnswers((prev) => ({ ...prev, [currentQuestion.id]: trimmed }));
+      notify(SUCCESS.ANSWER_SAVED);
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || data.error || 'Error al guardar la respuesta');
-        }
-      }
-
-      setRespuesta('');
-
-      if (direction === 'next') {
-        if (isLastQuestion) {
-          if (editMode) {
-            onEditComplete(currentQuestionIndex + 1); // go to resumen
-          } else {
-            onComplete();
-          }
-        } else {
-          onNext(currentQuestionIndex + 1);
-        }
-      } else if (direction === 'previous') {
-        if (editMode) {
-          onEditComplete('back');
-        } else {
-          onPrevious(currentQuestionIndex - 1);
-        }
+      if (editMode) {
+        finishEditing();
+      } else if (isLastQuestion) {
+        goToResumen();
+      } else {
+        setQuestionIndex(questionIndex + 1);
       }
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleSubmit = () => {
-    saveAndNavigate('next');
-  };
-
   const handlePrevious = () => {
-    saveAndNavigate('previous');
+    if (editMode) {
+      finishEditing();
+    } else if (!isFirstQuestion) {
+      setQuestionIndex(questionIndex - 1);
+    }
   };
 
-  if (loadingQuestions) {
-    return (
-      <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem', textAlign: 'center' }}>
-        <p>Cargando preguntas...</p>
-      </div>
-    );
-  }
+  if (loadingQuestions) return <Spinner label="Cargando preguntas..." />;
 
   if (questionsError) {
-    return (
-      <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem', textAlign: 'center', color: 'red' }}>
-        <p>Error al cargar preguntas: {questionsError}</p>
-      </div>
-    );
+    return <ErrorMessage message={questionsError} onRetry={load} />;
   }
 
   if (questions.length === 0) {
     return (
-      <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem', textAlign: 'center' }}>
-        <p>No hay preguntas disponibles</p>
+      <div style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
+        <p>No hay preguntas disponibles.</p>
+        <button onClick={goToIdeas} style={{ padding: '0.75rem 1.5rem', cursor: 'pointer' }}>
+          Volver a mis ideas
+        </button>
       </div>
     );
   }
 
-  const isEmpty = !respuesta || respuesta.trim() === '';
+  const nextDisabled = saving || !trimmed || isTooShort;
 
   return (
     <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem' }}>
-      <div style={{ marginBottom: '1.5rem', color: '#666', fontSize: '0.9rem' }}>
-        Pregunta {currentQuestionIndex + 1} de {questions.length}
-      </div>
-      <div style={{ marginBottom: '1rem' }}>
-        <div style={{ backgroundColor: '#f5f5f5', padding: '1rem', borderRadius: '4px', marginBottom: '0.5rem' }}>
-          <strong>{currentQuestion?.pregunta}</strong>
-        </div>
-        <progress value={currentQuestionIndex + 1} max={questions.length} style={{ width: '100%', height: '8px' }} />
-      </div>
+      <QuestionHeader
+        currentIndex={questionIndex}
+        total={questions.length}
+        title="Descubrimiento Inicial"
+      />
 
-      {error && (
-        <div style={{ color: 'red', marginBottom: '1rem', padding: '0.5rem', backgroundColor: '#ffe6e6', borderRadius: '4px' }}>
-          {error}
-        </div>
-      )}
-
-      <textarea
+      <QuestionCard
+        question={currentQuestion?.pregunta}
         value={respuesta}
         onChange={(e) => setRespuesta(e.target.value)}
-        placeholder="Tu respuesta aquí"
-        rows={4}
-        style={{
-          width: '100%',
-          padding: '0.75rem',
-          fontSize: '1rem',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          resize: 'vertical',
-          boxSizing: 'border-box',
-        }}
-        disabled={loading}
+        disabled={saving}
       />
+
+      <div
+        style={{
+          fontSize: '0.85rem',
+          color: trimmed && isTooShort ? '#dc3545' : '#666',
+          marginTop: '0.25rem',
+        }}
+      >
+        {trimmed.length}/{MIN_ANSWER_LENGTH} caracteres mínimos
+      </div>
+
+      <div style={{ marginTop: '1rem' }}>
+        <ErrorMessage message={error} />
+      </div>
 
       <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
         <button
           type="button"
           onClick={handlePrevious}
-          disabled={loading || isFirstQuestion}
+          disabled={saving || (!editMode && isFirstQuestion)}
           style={{
             flex: 1,
             padding: '0.75rem 1.5rem',
             fontSize: '1rem',
-            backgroundColor: loading || isFirstQuestion ? '#ccc' : '#6c757d',
+            backgroundColor: saving || (!editMode && isFirstQuestion) ? '#ccc' : '#6c757d',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: loading || isFirstQuestion ? 'not-allowed' : 'pointer',
+            cursor: saving || (!editMode && isFirstQuestion) ? 'not-allowed' : 'pointer',
           }}
         >
           {editMode ? 'Volver al resumen' : 'Anterior'}
         </button>
         <button
           type="button"
-          onClick={handleSubmit}
-          disabled={loading || isEmpty || !currentQuestion?.id}
+          onClick={handleNext}
+          disabled={nextDisabled}
           style={{
             flex: 1,
             padding: '0.75rem 1.5rem',
             fontSize: '1rem',
-            backgroundColor: loading || isEmpty || !currentQuestion?.id ? '#ccc' : 
-              isLastQuestion ? (editMode ? '#007bff' : '#dc3545') : '#28a745',
+            backgroundColor: nextDisabled ? '#ccc' : isLastQuestion ? '#dc3545' : '#28a745',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: loading || isEmpty || !currentQuestion?.id ? 'not-allowed' : 'pointer',
+            cursor: nextDisabled ? 'not-allowed' : 'pointer',
           }}
         >
-          {loading ? 'Guardando...' : isLastQuestion ? (editMode ? 'Ir al resumen' : 'Ir a Resumen') : 'Siguiente'}
+          {saving ? 'Guardando...' : editMode ? 'Guardar' : isLastQuestion ? 'Ir a Resumen' : 'Siguiente'}
         </button>
       </div>
     </div>

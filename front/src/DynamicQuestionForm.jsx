@@ -1,236 +1,204 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import QuestionHeader from './components/QuestionHeader';
+import QuestionCard from './components/QuestionCard';
+import Spinner from './components/Spinner';
+import ErrorMessage from './components/ErrorMessage';
+import { useApp } from './context/AppContext';
+import { useToast } from './context/ToastContext';
+import { api } from './api';
+import { ERRORS, SUCCESS, MIN_ANSWER_LENGTH } from './constants';
 
-const API_BASE = 'http://localhost:3001/api';
+function DynamicQuestionForm({ editMode = false }) {
+  const {
+    ideaId,
+    dynamicQuestionIndex,
+    setDynamicQuestionIndex,
+    goToFinalResume,
+    goToResumen,
+    finishEditing,
+  } = useApp();
+  const { notify } = useToast();
 
-function DynamicQuestionForm({ 
-  idea_id, 
-  dynamic_questions: questionsProp, 
-  currentQuestionIndex, 
-  onNext, 
-  onBack, 
-  onComplete,
-  editMode = false 
-}) {
+  const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers] = useState({});
   const [respuesta, setRespuesta] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [dynamic_questions, setDynamicQuestions] = useState(questionsProp || []);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [questionsError, setQuestionsError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoadingQuestions(true);
+    setQuestionsError(null);
+    try {
+      let data = await api.getDynamicQuestions(ideaId);
+
+      // First visit: Groq has not produced the deep-dive questions yet.
+      if (!data.dynamic_questions?.length) {
+        data = await api.generateDynamicQuestions(ideaId);
+      }
+
+      setQuestions(data.dynamic_questions || []);
+
+      const respuestasData = await api.getDynamicRespuestas(ideaId);
+      const byQuestion = {};
+      (respuestasData.dynamic_respuestas || []).forEach((r) => {
+        byQuestion[r.dynamic_question_id] = r.respuesta;
+      });
+      setAnswers(byQuestion);
+    } catch (err) {
+      setQuestionsError(err.message);
+    } finally {
+      setLoadingQuestions(false);
+    }
+  }, [ideaId]);
 
   useEffect(() => {
-    if (questionsProp && questionsProp.length > 0) {
-      setDynamicQuestions(questionsProp);
-      setLoadingQuestions(false);
-      return;
-    }
+    load();
+  }, [load]);
 
-    const fetchDynamicQuestions = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/ideas/${idea_id}/dynamic-questions`);
-        const data = await response.json();
+  const currentQuestion = questions[dynamicQuestionIndex];
 
-        if (!response.ok) {
-          throw new Error(data.message || data.error || 'Error al cargar preguntas dinámicas');
-        }
+  useEffect(() => {
+    setRespuesta(currentQuestion ? answers[currentQuestion.id] ?? '' : '');
+    setError(null);
+  }, [currentQuestion, answers]);
 
-        if (data.dynamic_questions && data.dynamic_questions.length > 0) {
-          setDynamicQuestions(data.dynamic_questions);
-        } else {
-          await generateDynamicQuestions();
-        }
-      } catch (err) {
-        setQuestionsError(err.message);
-      } finally {
-        setLoadingQuestions(false);
-      }
-    };
+  const trimmed = respuesta.trim();
+  const isTooShort = trimmed.length < MIN_ANSWER_LENGTH;
+  const isFirstQuestion = dynamicQuestionIndex === 0;
+  const isLastQuestion = dynamicQuestionIndex === questions.length - 1;
 
-    const generateDynamicQuestions = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/ideas/${idea_id}/generate-dynamic-questions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || data.error || 'Error al generar preguntas dinámicas');
-        }
-
-        if (data.dynamic_questions && data.dynamic_questions.length > 0) {
-          setDynamicQuestions(data.dynamic_questions);
-        }
-      } catch (err) {
-        setQuestionsError(err.message);
-      }
-    };
-
-    fetchDynamicQuestions();
-  }, [idea_id, questionsProp]);
-
-  const currentQuestion = dynamic_questions[currentQuestionIndex];
-  const isFirstQuestion = currentQuestionIndex === 0;
-  const isLastQuestion = currentQuestionIndex === dynamic_questions.length - 1;
-
-  const saveAndNavigate = async (direction) => {
+  const handleNext = async () => {
     setError(null);
 
-    if (direction === 'next' && (!respuesta || respuesta.trim() === '')) {
-      setError('La respuesta no puede estar vacía');
-      return;
-    }
+    if (!trimmed) return setError(ERRORS.ANSWER_EMPTY);
+    if (isTooShort) return setError(ERRORS.ANSWER_TOO_SHORT);
 
-    if (!currentQuestion?.id) {
-      setError('No hay pregunta disponible');
-      return;
-    }
-
-    setLoading(true);
-
+    setSaving(true);
     try {
-      if (direction === 'next') {
-        const response = await fetch(`${API_BASE}/dynamic-respuestas`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            idea_id,
-            dynamic_question_id: currentQuestion.id,
-            respuesta: respuesta.trim(),
-          }),
-        });
+      await api.saveDynamicRespuesta({
+        idea_id: ideaId,
+        dynamic_question_id: currentQuestion.id,
+        respuesta: trimmed,
+      });
+      setAnswers((prev) => ({ ...prev, [currentQuestion.id]: trimmed }));
+      notify(SUCCESS.ANSWER_SAVED);
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || data.error || 'Error al guardar la respuesta');
-        }
-      }
-
-      setRespuesta('');
-
-      if (direction === 'next') {
-        if (isLastQuestion) {
-          onComplete();
-        } else {
-          onNext(currentQuestionIndex + 1);
-        }
-      } else if (direction === 'previous') {
-        if (currentQuestionIndex > 0) {
-          onBack(currentQuestionIndex - 1);
-        }
+      if (editMode) {
+        finishEditing();
+      } else if (isLastQuestion) {
+        goToFinalResume();
+      } else {
+        setDynamicQuestionIndex(dynamicQuestionIndex + 1);
       }
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleSubmit = () => {
-    saveAndNavigate('next');
-  };
-
   const handlePrevious = () => {
-    saveAndNavigate('previous');
+    if (editMode) {
+      finishEditing();
+    } else if (isFirstQuestion) {
+      goToResumen();
+    } else {
+      setDynamicQuestionIndex(dynamicQuestionIndex - 1);
+    }
   };
 
   if (loadingQuestions) {
-    return (
-      <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem', textAlign: 'center' }}>
-        <p>Cargando preguntas dinámicas...</p>
-      </div>
-    );
+    return <Spinner label="Generando tu análisis profundo con IA..." />;
   }
 
   if (questionsError) {
+    return <ErrorMessage message={questionsError} onRetry={load} />;
+  }
+
+  if (questions.length === 0) {
     return (
-      <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem', textAlign: 'center', color: 'red' }}>
-        <p>Error al cargar preguntas dinámicas: {questionsError}</p>
+      <div style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
+        <p>{ERRORS.LOAD_DYNAMIC_QUESTIONS}</p>
+        <button onClick={load} style={{ padding: '0.75rem 1.5rem', cursor: 'pointer' }}>
+          Reintentar
+        </button>
       </div>
     );
   }
 
-  if (dynamic_questions.length === 0) {
-    return (
-      <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem', textAlign: 'center' }}>
-        <p>No hay preguntas dinámicas disponibles</p>
-      </div>
-    );
-  }
-
-  const isEmpty = !respuesta || respuesta.trim() === '';
+  const nextDisabled = saving || !trimmed || isTooShort;
 
   return (
     <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem' }}>
-      <div style={{ marginBottom: '1.5rem', color: '#666', fontSize: '0.9rem' }}>
-        Pregunta dinámica {currentQuestionIndex + 1} de {dynamic_questions.length}
-      </div>
-      <div style={{ marginBottom: '1rem' }}>
-        <div style={{ backgroundColor: '#f5f5f5', padding: '1rem', borderRadius: '4px', marginBottom: '0.5rem' }}>
-          <strong>{currentQuestion?.pregunta}</strong>
-        </div>
-        <progress value={currentQuestionIndex + 1} max={dynamic_questions.length} style={{ width: '100%', height: '8px' }} />
-      </div>
+      <QuestionHeader
+        currentIndex={dynamicQuestionIndex}
+        total={questions.length}
+        title="Análisis Profundo"
+      />
 
-      {error && (
-        <div style={{ color: 'red', marginBottom: '1rem', padding: '0.5rem', backgroundColor: '#ffe6e6', borderRadius: '4px' }}>
-          {error}
-        </div>
-      )}
-
-      <textarea
+      <QuestionCard
+        question={currentQuestion?.pregunta}
         value={respuesta}
         onChange={(e) => setRespuesta(e.target.value)}
-        placeholder="Tu respuesta aquí"
-        rows={4}
-        style={{
-          width: '100%',
-          padding: '0.75rem',
-          fontSize: '1rem',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          resize: 'vertical',
-          boxSizing: 'border-box',
-        }}
-        disabled={loading}
+        disabled={saving}
       />
+
+      <div
+        style={{
+          fontSize: '0.85rem',
+          color: trimmed && isTooShort ? '#dc3545' : '#666',
+          marginTop: '0.25rem',
+        }}
+      >
+        {trimmed.length}/{MIN_ANSWER_LENGTH} caracteres mínimos
+      </div>
+
+      <div style={{ marginTop: '1rem' }}>
+        <ErrorMessage message={error} />
+      </div>
 
       <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
         <button
           type="button"
           onClick={handlePrevious}
-          disabled={loading || isFirstQuestion}
+          disabled={saving}
           style={{
             flex: 1,
             padding: '0.75rem 1.5rem',
             fontSize: '1rem',
-            backgroundColor: loading || isFirstQuestion ? '#ccc' : '#6c757d',
+            backgroundColor: saving ? '#ccc' : '#6c757d',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: loading || isFirstQuestion ? 'not-allowed' : 'pointer',
+            cursor: saving ? 'not-allowed' : 'pointer',
           }}
         >
-          Anterior
+          {editMode ? 'Volver al resumen' : 'Anterior'}
         </button>
         <button
           type="button"
-          onClick={handleSubmit}
-          disabled={loading || isEmpty || !currentQuestion?.id}
+          onClick={handleNext}
+          disabled={nextDisabled}
           style={{
             flex: 1,
             padding: '0.75rem 1.5rem',
             fontSize: '1rem',
-            backgroundColor: loading || isEmpty || !currentQuestion?.id ? '#ccc' : 
-              isLastQuestion ? (editMode ? '#007bff' : '#dc3545') : '#28a745',
+            backgroundColor: nextDisabled ? '#ccc' : isLastQuestion ? '#dc3545' : '#28a745',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: loading || isEmpty || !currentQuestion?.id ? 'not-allowed' : 'pointer',
+            cursor: nextDisabled ? 'not-allowed' : 'pointer',
           }}
         >
-          {loading ? 'Guardando...' : isLastQuestion ? (editMode ? 'Guardar y volver' : 'Finalizar') : 'Siguiente'}
+          {saving
+            ? 'Guardando...'
+            : editMode
+              ? 'Guardar'
+              : isLastQuestion
+                ? 'Ver resumen final'
+                : 'Siguiente'}
         </button>
       </div>
     </div>

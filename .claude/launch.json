@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "back",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--workspace=back"],
+      "port": 3001
+    },
+    {
+      "name": "front",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--workspace=front"],
+      "port": 5173
+    }
+  ]
+}
