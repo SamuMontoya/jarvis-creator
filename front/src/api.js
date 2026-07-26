@@ -75,8 +75,8 @@ export const api = {
       fallbackError: ERRORS.GENERATE_DOCUMENT,
     }),
 
-  generatePdfSource: (ideaId) =>
-    request(`/ideas/${ideaId}/generate-final-pdf`, {
+  generateMarkdownSource: (ideaId) =>
+    request(`/ideas/${ideaId}/generate-final-markdown`, {
       method: 'POST',
       fallbackError: ERRORS.GENERATE_DOCUMENT,
     }),

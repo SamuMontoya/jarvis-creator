@@ -444,7 +444,7 @@ describe('Generación de documentos', () => {
     withData();
     const md = await request(app).post(`/api/ideas/${IDEA_ID}/generate-final-markdown`);
     withData();
-    const pdf = await request(app).post(`/api/ideas/${IDEA_ID}/generate-final-pdf`);
+    const pdf = await request(app).post(`/api/ideas/${IDEA_ID}/generate-final-markdown`);
 
     expect(pdf.status).toBe(200);
     expect(pdf.body.markdown).toBeTruthy();

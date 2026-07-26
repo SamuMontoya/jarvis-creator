@@ -194,8 +194,8 @@ async function main() {
     return `${markdown.length} caracteres`;
   });
 
-  await step('j. POST /generate-final-pdf — fuente del PDF', async () => {
-    const { markdown } = await api(`/ideas/${ideaId}/generate-final-pdf`, { method: 'POST' });
+  await step('j. POST /generate-final-markdown — fuente del markdown', async () => {
+    const { markdown } = await api(`/ideas/${ideaId}/generate-final-markdown`, { method: 'POST' });
     assert(markdown?.length > 500, 'markdown demasiado corto');
     return `${markdown.length} caracteres`;
   });

@@ -97,7 +97,7 @@ function FinalResumen() {
   const handleDownloadPDF = useCallback(
     () =>
       runDownload(async () => {
-        const { markdown } = await api.generatePdfSource(ideaId);
+        const { markdown } = await api.generateMarkdownSource(ideaId);
         const doc = await markdownToPdf(markdown);
         doc.save(`${fileStem}.pdf`);
       }),

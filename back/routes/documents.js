@@ -200,7 +200,7 @@ router.post('/ideas/:id/generate-final-markdown', async (req, res, next) => {
 
 // The PDF is rendered client-side from this markdown (jsPDF); the server only
 // supplies the source so both downloads stay byte-identical in content.
-router.post('/ideas/:id/generate-final-pdf', async (req, res, next) => {
+router.post('/ideas/:id/generate-final-markdown', async (req, res, next) => {
   try {
     const data = await loadOrRespond(req, res);
     if (!data) return;

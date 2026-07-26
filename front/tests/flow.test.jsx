@@ -463,7 +463,7 @@ describe('Resumen final y descargas', () => {
 
     seedFinal();
     const calls = setupFinal({
-      'POST /generate-final-pdf': { markdown: '# Mi idea\n\nContenido' },
+      'POST /generate-final-markdown': { markdown: '# Mi idea\n\nContenido' },
     });
 
     renderApp(<App />);
@@ -472,7 +472,7 @@ describe('Resumen final y descargas', () => {
     await user.click(screen.getByRole('button', { name: /Descargar PDF/ }));
 
     await waitFor(() => {
-      expect(calls.some((c) => c.url.includes('generate-final-pdf'))).toBe(true);
+      expect(calls.some((c) => c.url.includes('generate-final-markdown'))).toBe(true);
     });
   });
 
