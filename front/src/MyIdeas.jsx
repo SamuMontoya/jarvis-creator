@@ -17,6 +17,23 @@ const formatDate = (dateStr) =>
     year: 'numeric',
   });
 
+const ESTADO_PILL = {
+  draft: { label: 'Borrador', background: 'var(--color-paper-warm)', color: 'var(--color-stone)' },
+  refined: { label: 'Completada', background: 'rgba(200,134,10,0.14)', color: 'var(--color-amber-dim)' },
+};
+
+function EstadoPill({ estado }) {
+  const style = ESTADO_PILL[estado] || ESTADO_PILL.draft;
+  return (
+    <span
+      className="inline-flex whitespace-nowrap rounded-full px-3 py-1 font-body text-xs font-medium"
+      style={{ backgroundColor: style.background, color: style.color }}
+    >
+      {style.label}
+    </span>
+  );
+}
+
 function IconButton({ icon: Icon, label, onClick, disabled, tone = 'stone' }) {
   return (
     <button
@@ -126,7 +143,7 @@ function MyIdeas() {
       <TabsFiltro filter={filter} onFilterChange={setFilter} ideas={ideas} />
 
       {filteredIdeas.length === 0 ? (
-        <div className="ds-card px-4 py-12 text-center text-stone">
+        <div className="rounded-b-card border border-t-0 border-dust bg-white px-4 py-12 text-center text-stone shadow-sm">
           <p className="m-0 font-body">
             {ideas.length === 0 ? 'Todavía no tienes ideas.' : 'No hay ideas con este filtro.'}
           </p>
@@ -135,59 +152,109 @@ function MyIdeas() {
           )}
         </div>
       ) : (
-        <div className="ds-card overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse text-left">
-            <thead>
-              <tr className="border-b border-dust">
-                <th className="ds-label px-4 py-3 font-normal">Título</th>
-                <th className="ds-label px-4 py-3 font-normal">Descripción</th>
-                <th className="ds-label whitespace-nowrap px-4 py-3 font-normal">Creada</th>
-                <th className="ds-label px-4 py-3 text-right font-normal">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredIdeas.map((idea) => {
-                const isRefined = idea.estado === IDEA_STATES.REFINED;
-                const isDeleting = pendingDelete?.id === idea.id && deleting;
-                return (
-                  <tr
-                    key={idea.id}
-                    className="cursor-pointer border-b border-dust last:border-b-0 hover:bg-paper-warm"
-                    onClick={() => handleView(idea)}
-                  >
-                    <td className="px-4 py-3 font-display font-semibold text-ink">{idea.titulo}</td>
-                    <td className="max-w-[320px] truncate px-4 py-3 font-body text-sm text-stone">
-                      {idea.texto_idea}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-body text-sm text-stone">
-                      {formatDate(idea.created_at)}
-                    </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-end gap-1">
-                        <IconButton icon={Eye} label={isRefined ? 'Ver idea' : 'Continuar'} onClick={() => handleView(idea)} />
-                        <IconButton icon={Pencil} label="Editar" onClick={() => setEditingIdea(idea)} />
-                        {idea.plan_id && (
+        <>
+          {/* Table: lg and up, where every column has room to breathe. */}
+          <div className="hidden rounded-b-card border border-t-0 border-dust bg-white shadow-sm lg:block">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-dust">
+                  <th className="ds-label px-4 py-3 font-bold">Título</th>
+                  <th className="ds-label px-4 py-3 font-bold">Descripción</th>
+                  <th className="ds-label px-4 py-3 font-bold">Estado</th>
+                  <th className="ds-label whitespace-nowrap px-4 py-3 font-bold">Creada</th>
+                  <th className="ds-label px-4 py-3 text-right font-bold">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredIdeas.map((idea) => {
+                  const isRefined = idea.estado === IDEA_STATES.REFINED;
+                  const isDeleting = pendingDelete?.id === idea.id && deleting;
+                  return (
+                    <tr
+                      key={idea.id}
+                      className="cursor-pointer border-b border-dust last:border-b-0 hover:bg-paper-warm"
+                      onClick={() => handleView(idea)}
+                    >
+                      <td className="px-4 py-3 font-display font-semibold text-ink">{idea.titulo}</td>
+                      <td className="max-w-[280px] truncate px-4 py-3 font-body text-sm text-stone">
+                        {idea.texto_idea}
+                      </td>
+                      <td className="px-4 py-3">
+                        <EstadoPill estado={idea.estado} />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-body text-sm text-stone">
+                        {formatDate(idea.created_at)}
+                      </td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-end gap-1">
+                          <IconButton icon={Eye} label={isRefined ? 'Ver idea' : 'Continuar'} onClick={() => handleView(idea)} />
+                          <IconButton icon={Pencil} label="Editar" onClick={() => setEditingIdea(idea)} />
+                          {idea.plan_id && (
+                            <IconButton
+                              icon={ListTree}
+                              label="Ver plan"
+                              onClick={() => navigate(routes.planes(idea.id))}
+                            />
+                          )}
                           <IconButton
-                            icon={ListTree}
-                            label="Ver plan"
-                            onClick={() => navigate(routes.planes(idea.id))}
+                            icon={Trash2}
+                            label="Eliminar"
+                            tone="danger"
+                            disabled={isDeleting}
+                            onClick={() => setPendingDelete(idea)}
                           />
-                        )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Stacked cards below lg — a table with 5 columns has no room to
+              breathe on tablet/mobile, so it becomes a list instead. */}
+          <div className="flex flex-col gap-3 rounded-b-card border border-t-0 border-dust bg-white p-3 shadow-sm lg:hidden">
+            {filteredIdeas.map((idea) => {
+              const isRefined = idea.estado === IDEA_STATES.REFINED;
+              const isDeleting = pendingDelete?.id === idea.id && deleting;
+              return (
+                <div
+                  key={idea.id}
+                  onClick={() => handleView(idea)}
+                  className="cursor-pointer rounded-lg border border-dust p-4"
+                >
+                  <div className="mb-1 flex items-start justify-between gap-3">
+                    <span className="font-display font-semibold text-ink">{idea.titulo}</span>
+                    <EstadoPill estado={idea.estado} />
+                  </div>
+                  <p className="m-0 mb-2 font-body text-sm text-stone">{idea.texto_idea}</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-body text-xs text-stone">{formatDate(idea.created_at)}</span>
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <IconButton icon={Eye} label={isRefined ? 'Ver idea' : 'Continuar'} onClick={() => handleView(idea)} />
+                      <IconButton icon={Pencil} label="Editar" onClick={() => setEditingIdea(idea)} />
+                      {idea.plan_id && (
                         <IconButton
-                          icon={Trash2}
-                          label="Eliminar"
-                          tone="danger"
-                          disabled={isDeleting}
-                          onClick={() => setPendingDelete(idea)}
+                          icon={ListTree}
+                          label="Ver plan"
+                          onClick={() => navigate(routes.planes(idea.id))}
                         />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      )}
+                      <IconButton
+                        icon={Trash2}
+                        label="Eliminar"
+                        tone="danger"
+                        disabled={isDeleting}
+                        onClick={() => setPendingDelete(idea)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       <EditIdeaDialog

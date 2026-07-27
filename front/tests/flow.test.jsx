@@ -65,12 +65,16 @@ describe('Listado de ideas', () => {
     });
 
     renderApp(<App />);
-    await screen.findByText('Borrador uno');
+    await screen.findByRole('table');
 
     await user.click(screen.getByRole('button', { name: /Completadas \(1\)/ }));
 
-    expect(screen.getByText('Completada uno')).toBeInTheDocument();
-    expect(screen.queryByText('Borrador uno')).not.toBeInTheDocument();
+    // Ideas render twice in the DOM (table for lg+, stacked cards below lg —
+    // real CSS picks one, jsdom has no layout so both exist); scope to the
+    // table to assert a single, unambiguous match.
+    const table = within(screen.getByRole('table'));
+    expect(table.getByText('Completada uno')).toBeInTheDocument();
+    expect(table.queryByText('Borrador uno')).not.toBeInTheDocument();
     expect(calls.filter((c) => c.url.endsWith('/ideas')).length).toBe(1);
   });
 
@@ -112,9 +116,11 @@ describe('Borrado de idea', () => {
     });
 
     renderApp(<App />);
-    await screen.findByText('Idea a borrar');
+    await screen.findByRole('table');
 
-    await user.click(screen.getByRole('button', { name: 'Eliminar' }));
+    // Ideas render twice (table for lg+, stacked cards below lg); scope to
+    // the table so there is exactly one "Eliminar" button to click.
+    await user.click(within(screen.getByRole('table')).getByRole('button', { name: 'Eliminar' }));
 
     // El modal está abierto pero todavía no se llamó al backend.
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -135,14 +141,14 @@ describe('Borrado de idea', () => {
     });
 
     renderApp(<App />);
-    await screen.findByText('Idea intacta');
+    await screen.findByRole('table');
 
-    await user.click(screen.getByRole('button', { name: 'Eliminar' }));
+    await user.click(within(screen.getByRole('table')).getByRole('button', { name: 'Eliminar' }));
     await user.click(screen.getByRole('button', { name: 'Cancelar' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
-    expect(screen.getByText('Idea intacta')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByText('Idea intacta')).toBeInTheDocument();
   });
 });
 
