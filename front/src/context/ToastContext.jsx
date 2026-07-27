@@ -32,29 +32,18 @@ export function ToastProvider({ children }) {
       <div
         role="status"
         aria-live="polite"
-        style={{
-          position: 'fixed',
-          bottom: '1.5rem',
-          right: '1.5rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.5rem',
-          zIndex: 1000,
-        }}
+        className="fixed bottom-6 right-6 z-[1000] flex flex-col gap-2"
       >
         {toasts.map((toast) => (
           <div
             key={toast.id}
             onClick={() => dismiss(toast.id)}
-            style={{
-              padding: '0.75rem 1.25rem',
-              borderRadius: '8px',
-              color: 'white',
-              backgroundColor: toast.type === 'error' ? '#dc3545' : '#28a745',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              cursor: 'pointer',
-              maxWidth: '320px',
-            }}
+            className="max-w-[320px] cursor-pointer border-l-2 px-5 py-3 font-body text-sm"
+            style={
+              toast.type === 'error'
+                ? { backgroundColor: 'var(--color-ink)', color: 'var(--color-white)', borderColor: 'var(--color-danger)' }
+                : { backgroundColor: 'var(--color-white)', color: 'var(--color-ink)', borderColor: 'var(--color-amber)', border: '1px solid var(--color-dust)', borderLeftWidth: '2px', borderLeftColor: 'var(--color-amber)' }
+            }
           >
             {toast.message}
           </div>

@@ -3,15 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import App from '../src/App';
-import {
-  IDEA_ID,
-  makeIdea,
-  makeQuestions,
-  makeDynamicQuestions,
-  mockApi,
-  renderApp,
-  seedSession,
-} from './helpers';
+import { routes } from '../src/constants';
+import { IDEA_ID, makeIdea, makeQuestions, makeDynamicQuestions, mockApi, renderApp } from './helpers';
 
 const QUESTIONS = makeQuestions(5);
 const DYNAMIC_QUESTIONS = makeDynamicQuestions(10);
@@ -36,16 +29,28 @@ describe('Listado de ideas', () => {
     mockApi({
       'GET /ideas': {
         ideas: [
-          makeIdea({ id: 'b', texto_idea: 'Idea reciente', updated_at: '2026-07-10T00:00:00Z' }),
-          makeIdea({ id: 'a', texto_idea: 'Idea vieja', updated_at: '2026-07-01T00:00:00Z' }),
+          makeIdea({
+            id: 'b',
+            titulo: 'Idea reciente',
+            texto_idea: 'Descripción reciente',
+            updated_at: '2026-07-10T00:00:00Z',
+          }),
+          makeIdea({
+            id: 'a',
+            titulo: 'Idea vieja',
+            texto_idea: 'Descripción vieja',
+            updated_at: '2026-07-01T00:00:00Z',
+          }),
         ],
       },
     });
 
     renderApp(<App />);
 
-    const headings = await screen.findAllByRole('heading', { level: 3 });
-    expect(headings.map((h) => h.textContent)).toEqual(['Idea reciente', 'Idea vieja']);
+    const rows = await screen.findAllByRole('row');
+    // rows[0] is the header row.
+    expect(rows[1]).toHaveTextContent('Idea reciente');
+    expect(rows[2]).toHaveTextContent('Idea vieja');
   });
 
   it('filtra por estado sin volver a pedir al backend', async () => {
@@ -53,8 +58,8 @@ describe('Listado de ideas', () => {
     const calls = mockApi({
       'GET /ideas': {
         ideas: [
-          makeIdea({ id: 'a', texto_idea: 'Borrador uno', estado: 'draft' }),
-          makeIdea({ id: 'b', texto_idea: 'Completada uno', estado: 'refined' }),
+          makeIdea({ id: 'a', titulo: 'Borrador uno', estado: 'draft' }),
+          makeIdea({ id: 'b', titulo: 'Completada uno', estado: 'refined' }),
         ],
       },
     });
@@ -102,7 +107,7 @@ describe('Borrado de idea', () => {
   it('exige confirmación explícita antes de llamar al backend', async () => {
     const user = userEvent.setup();
     const calls = mockApi({
-      'GET /ideas': { ideas: [makeIdea({ texto_idea: 'Idea a borrar' })] },
+      'GET /ideas': { ideas: [makeIdea({ titulo: 'Idea a borrar' })] },
       'DELETE /ideas': { deleted: true },
     });
 
@@ -126,7 +131,7 @@ describe('Borrado de idea', () => {
   it('cancelar cierra el modal sin borrar', async () => {
     const user = userEvent.setup();
     const calls = mockApi({
-      'GET /ideas': { ideas: [makeIdea({ texto_idea: 'Idea intacta' })] },
+      'GET /ideas': { ideas: [makeIdea({ titulo: 'Idea intacta' })] },
     });
 
     renderApp(<App />);
@@ -154,14 +159,18 @@ describe('Creación de idea', () => {
     renderApp(<App />);
     await screen.findByText('Todavía no tienes ideas.');
     await user.click(screen.getByRole('button', { name: 'Nueva idea' }));
+    await screen.findByLabelText('Título');
 
     const submit = screen.getByRole('button', { name: 'Enviar' });
     expect(submit).toBeDisabled();
 
-    await user.type(screen.getByLabelText(/Qué idea quieres construir/), 'corta');
+    await user.type(screen.getByLabelText('Título'), 'Paseador de perros');
     expect(submit).toBeDisabled();
 
-    await user.type(screen.getByLabelText(/Qué idea quieres construir/), ' pero ya suficientemente larga');
+    await user.type(screen.getByLabelText('Descripción'), 'corta');
+    expect(submit).toBeDisabled();
+
+    await user.type(screen.getByLabelText('Descripción'), ' pero ya suficientemente larga');
     expect(submit).toBeEnabled();
   });
 
@@ -177,9 +186,11 @@ describe('Creación de idea', () => {
     renderApp(<App />);
     await screen.findByText('Todavía no tienes ideas.');
     await user.click(screen.getByRole('button', { name: 'Nueva idea' }));
+    await screen.findByLabelText('Título');
 
+    await user.type(screen.getByLabelText('Título'), 'Paseador de perros');
     await user.type(
-      screen.getByLabelText(/Qué idea quieres construir/),
+      screen.getByLabelText('Descripción'),
       'Una app para pasear perros en Bogotá'
     );
     await user.click(screen.getByRole('button', { name: 'Enviar' }));
@@ -198,12 +209,13 @@ describe('Preguntas genéricas', () => {
       'GET /ideas': { idea: makeIdea() },
     });
 
+  const renderAtPreguntas = () => renderApp(<App />, { initialEntries: [routes.preguntas(IDEA_ID)] });
+
   it('guarda la respuesta y avanza a la siguiente pregunta', async () => {
     const user = userEvent.setup();
-    seedSession({ ideaId: IDEA_ID, stage: 'questions', questionIndex: 0, dynamicQuestionIndex: 0 });
     const calls = setup();
 
-    renderApp(<App />);
+    renderAtPreguntas();
     await screen.findByText('Pregunta genérica 1');
 
     await user.type(screen.getByRole('textbox'), 'Los dueños no tienen tiempo');
@@ -220,10 +232,9 @@ describe('Preguntas genéricas', () => {
   });
 
   it('rellena la respuesta ya guardada al volver a una pregunta', async () => {
-    seedSession({ ideaId: IDEA_ID, stage: 'questions', questionIndex: 0, dynamicQuestionIndex: 0 });
     setup(answersFor(QUESTIONS, 1));
 
-    renderApp(<App />);
+    renderAtPreguntas();
 
     await waitFor(() => {
       expect(screen.getByRole('textbox')).toHaveValue('Respuesta a la pregunta 1');
@@ -231,10 +242,9 @@ describe('Preguntas genéricas', () => {
   });
 
   it('deshabilita "Anterior" en la primera pregunta', async () => {
-    seedSession({ ideaId: IDEA_ID, stage: 'questions', questionIndex: 0, dynamicQuestionIndex: 0 });
     setup();
 
-    renderApp(<App />);
+    renderAtPreguntas();
     await screen.findByText('Pregunta genérica 1');
 
     expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled();
@@ -242,12 +252,17 @@ describe('Preguntas genéricas', () => {
 
   it('la última pregunta lleva al resumen', async () => {
     const user = userEvent.setup();
-    seedSession({ ideaId: IDEA_ID, stage: 'questions', questionIndex: 4, dynamicQuestionIndex: 0 });
-    setup(answersFor(QUESTIONS, 5));
+    setup(answersFor(QUESTIONS, 4));
 
-    renderApp(<App />);
-    await screen.findByText('Pregunta genérica 5');
+    renderAtPreguntas();
+    await screen.findByText('Pregunta genérica 1');
 
+    for (let i = 0; i < 4; i += 1) {
+      await user.click(screen.getByRole('button', { name: 'Siguiente' }));
+      await screen.findByText(`Pregunta genérica ${i + 2}`);
+    }
+
+    await user.type(screen.getByRole('textbox'), 'Respuesta final suficientemente larga');
     await user.click(screen.getByRole('button', { name: 'Ir a Resumen' }));
 
     expect(await screen.findByText('Resumen de tu idea')).toBeInTheDocument();
@@ -255,9 +270,10 @@ describe('Preguntas genéricas', () => {
 });
 
 describe('Resumen y paso al análisis profundo', () => {
+  const renderAtResumen = () => renderApp(<App />, { initialEntries: [routes.resumen(IDEA_ID)] });
+
   it('lista las respuestas y permite entrar al análisis profundo', async () => {
     const user = userEvent.setup();
-    seedSession({ ideaId: IDEA_ID, stage: 'resumen', questionIndex: 4, dynamicQuestionIndex: 0 });
 
     mockApi({
       'GET /questions': { questions: QUESTIONS },
@@ -269,7 +285,7 @@ describe('Resumen y paso al análisis profundo', () => {
       },
     });
 
-    renderApp(<App />);
+    renderAtResumen();
 
     expect(await screen.findByText('Resumen de tu idea')).toBeInTheDocument();
     expect(screen.getByText('1. Pregunta genérica 1')).toBeInTheDocument();
@@ -282,7 +298,6 @@ describe('Resumen y paso al análisis profundo', () => {
 
   it('editar una respuesta abre esa pregunta y vuelve al resumen al guardar', async () => {
     const user = userEvent.setup();
-    seedSession({ ideaId: IDEA_ID, stage: 'resumen', questionIndex: 4, dynamicQuestionIndex: 0 });
 
     mockApi({
       'GET /questions': { questions: QUESTIONS },
@@ -293,7 +308,7 @@ describe('Resumen y paso al análisis profundo', () => {
       'POST /respuestas': { respuesta: { id: 'updated' } },
     });
 
-    renderApp(<App />);
+    renderAtResumen();
     await screen.findByText('Resumen de tu idea');
 
     await user.click(screen.getByText('2. Pregunta genérica 2'));
@@ -310,14 +325,9 @@ describe('Resumen y paso al análisis profundo', () => {
 });
 
 describe('Análisis profundo', () => {
-  it('genera las preguntas con Groq si todavía no existen', async () => {
-    seedSession({
-      ideaId: IDEA_ID,
-      stage: 'dynamic-questions',
-      questionIndex: 4,
-      dynamicQuestionIndex: 0,
-    });
+  const renderAtAnalisis = () => renderApp(<App />, { initialEntries: [routes.analisis(IDEA_ID)] });
 
+  it('genera las preguntas con Groq si todavía no existen', async () => {
     const calls = mockApi({
       'GET /ideas': (call) => {
         if (call.url.includes('/dynamic-questions')) return { dynamic_questions: [] };
@@ -327,20 +337,13 @@ describe('Análisis profundo', () => {
       'POST /generate-dynamic-questions': { dynamic_questions: DYNAMIC_QUESTIONS },
     });
 
-    renderApp(<App />);
+    renderAtAnalisis();
 
     expect(await screen.findByText('Pregunta dinámica 1')).toBeInTheDocument();
     expect(calls.some((c) => c.url.includes('generate-dynamic-questions'))).toBe(true);
   });
 
   it('no regenera si el backend ya tiene preguntas', async () => {
-    seedSession({
-      ideaId: IDEA_ID,
-      stage: 'dynamic-questions',
-      questionIndex: 4,
-      dynamicQuestionIndex: 0,
-    });
-
     const calls = mockApi({
       'GET /ideas': (call) => {
         if (call.url.includes('/dynamic-questions')) return { dynamic_questions: DYNAMIC_QUESTIONS };
@@ -349,43 +352,47 @@ describe('Análisis profundo', () => {
       },
     });
 
-    renderApp(<App />);
+    renderAtAnalisis();
     await screen.findByText('Pregunta dinámica 1');
 
     expect(calls.some((c) => c.url.includes('generate-dynamic-questions'))).toBe(false);
   });
 
-  it('la última pregunta dinámica lleva al resumen final', async () => {
+  it('la última pregunta dinámica lleva a la idea', async () => {
     const user = userEvent.setup();
-    seedSession({
-      ideaId: IDEA_ID,
-      stage: 'dynamic-questions',
-      questionIndex: 4,
-      dynamicQuestionIndex: 9,
-    });
 
     mockApi({
       'GET /questions': { questions: QUESTIONS },
       'GET /ideas': (call) => {
         if (call.url.includes('/dynamic-questions')) return { dynamic_questions: DYNAMIC_QUESTIONS };
         if (call.url.includes('/dynamic-respuestas'))
-          return { dynamic_respuestas: dynamicAnswersFor(DYNAMIC_QUESTIONS, 10) };
+          return { dynamic_respuestas: dynamicAnswersFor(DYNAMIC_QUESTIONS, 9) };
         if (call.url.includes('/respuestas')) return { respuestas: answersFor(QUESTIONS, 5) };
+        if (call.url.includes('/plan')) return { plan_id: null };
         return { idea: makeIdea() };
       },
       'POST /dynamic-respuestas': { respuesta: { id: 'x' } },
     });
 
-    renderApp(<App />);
-    await screen.findByText('Pregunta dinámica 10');
+    renderAtAnalisis();
+    await screen.findByText('Pregunta dinámica 1');
 
+    for (let i = 0; i < 9; i += 1) {
+      await user.type(screen.getByRole('textbox'), 'Respuesta profunda suficientemente larga');
+      await user.click(screen.getByRole('button', { name: 'Siguiente' }));
+      await screen.findByText(`Pregunta dinámica ${i + 2}`);
+    }
+
+    await user.type(screen.getByRole('textbox'), 'Respuesta profunda final suficientemente larga');
     await user.click(screen.getByRole('button', { name: 'Ver resumen final' }));
 
-    expect(await screen.findByText('Resumen Final Completo')).toBeInTheDocument();
+    expect(await screen.findByText('Descubrimiento inicial')).toBeInTheDocument();
   });
 });
 
-describe('Resumen final y descargas', () => {
+describe('Idea (resumen final y descargas)', () => {
+  const renderAtIdea = () => renderApp(<App />, { initialEntries: [routes.idea(IDEA_ID)] });
+
   const setupFinal = (extra = {}) =>
     mockApi({
       'GET /questions': { questions: QUESTIONS },
@@ -393,38 +400,31 @@ describe('Resumen final y descargas', () => {
         if (call.url.includes('/dynamic-respuestas'))
           return { dynamic_respuestas: dynamicAnswersFor(DYNAMIC_QUESTIONS, 10) };
         if (call.url.includes('/respuestas')) return { respuestas: answersFor(QUESTIONS, 5) };
+        if (call.url.includes('/plan')) return { plan_id: null };
         return { idea: makeIdea() };
       },
       ...extra,
     });
 
-  const seedFinal = () =>
-    seedSession({
-      ideaId: IDEA_ID,
-      stage: 'final-resume',
-      questionIndex: 4,
-      dynamicQuestionIndex: 9,
-    });
-
   it('muestra ambas secciones de respuestas', async () => {
-    seedFinal();
     setupFinal();
 
-    renderApp(<App />);
+    renderAtIdea();
 
-    expect(await screen.findByText('Resumen Final Completo')).toBeInTheDocument();
-    expect(screen.getByText('Definición (Descubrimiento Inicial)')).toBeInTheDocument();
-    expect(screen.getByText('Análisis Profundo')).toBeInTheDocument();
+    await screen.findByText(/./, { selector: 'h1' });
+    expect(screen.getByText('Descubrimiento inicial')).toBeInTheDocument();
+    expect(screen.getByText('Análisis profundo')).toBeInTheDocument();
     expect(screen.getByText('1. Pregunta genérica 1')).toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByText('Análisis profundo'));
     expect(screen.getByText('1. Pregunta dinámica 1')).toBeInTheDocument();
   });
 
   it('solo ofrece la descarga en Markdown, sin HTML ni PDF', async () => {
-    seedFinal();
     setupFinal();
 
-    renderApp(<App />);
-    await screen.findByText('Resumen Final Completo');
+    renderAtIdea();
+    await screen.findByText(/./, { selector: 'h1' });
 
     expect(screen.getByRole('button', { name: /Descargar Markdown/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Descargar HTML/ })).not.toBeInTheDocument();
@@ -433,13 +433,12 @@ describe('Resumen final y descargas', () => {
 
   it('descarga el Markdown generado por el backend', async () => {
     const user = userEvent.setup();
-    seedFinal();
     const calls = setupFinal({
       'POST /generate-final-markdown': { markdown: '# Mi idea\n\nContenido' },
     });
 
-    renderApp(<App />);
-    await screen.findByText('Resumen Final Completo');
+    renderAtIdea();
+    await screen.findByText(/./, { selector: 'h1' });
 
     await user.click(screen.getByRole('button', { name: /Descargar Markdown/ }));
 
@@ -452,7 +451,6 @@ describe('Resumen final y descargas', () => {
 
   it('avisa al usuario si la generación falla', async () => {
     const user = userEvent.setup();
-    seedFinal();
     setupFinal({
       'POST /generate-final-markdown': {
         status: 500,
@@ -460,23 +458,22 @@ describe('Resumen final y descargas', () => {
       },
     });
 
-    renderApp(<App />);
-    await screen.findByText('Resumen Final Completo');
+    renderAtIdea();
+    await screen.findByText(/./, { selector: 'h1' });
 
     await user.click(screen.getByRole('button', { name: /Descargar Markdown/ }));
 
     expect(await screen.findByText('No pudimos generar el documento.')).toBeInTheDocument();
   });
 
-  it('finalizar marca la idea como refined, avisa y vuelve al listado', async () => {
+  it('finalizar marca la idea como refined y oculta el botón de finalizar', async () => {
     const user = userEvent.setup();
-    seedFinal();
     const calls = setupFinal({
       'PATCH /ideas': { idea: makeIdea({ estado: 'refined' }) },
     });
 
-    renderApp(<App />);
-    await screen.findByText('Resumen Final Completo');
+    renderAtIdea();
+    await screen.findByText(/./, { selector: 'h1' });
 
     await user.click(screen.getByRole('button', { name: 'Finalizar idea' }));
 
@@ -486,12 +483,11 @@ describe('Resumen final y descargas', () => {
     });
 
     expect(await screen.findByText('Idea finalizada')).toBeInTheDocument();
-    expect(await screen.findByText('Mis Ideas')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Finalizar idea' })).not.toBeInTheDocument();
   });
 
-  it('si el backend rechaza el PATCH, avisa el error y se queda en el resumen', async () => {
+  it('si el backend rechaza el PATCH, avisa el error y se queda en la idea', async () => {
     const user = userEvent.setup();
-    seedFinal();
     setupFinal({
       'PATCH /ideas': {
         status: 500,
@@ -499,55 +495,12 @@ describe('Resumen final y descargas', () => {
       },
     });
 
-    renderApp(<App />);
-    await screen.findByText('Resumen Final Completo');
+    renderAtIdea();
+    await screen.findByText(/./, { selector: 'h1' });
 
     await user.click(screen.getByRole('button', { name: 'Finalizar idea' }));
 
     expect(await screen.findByText('No pudimos actualizar el estado de tu idea.')).toBeInTheDocument();
-    expect(screen.getByText('Resumen Final Completo')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Finalizar idea' })).toBeEnabled();
-  });
-});
-
-describe('Recuperación de progreso tras recargar', () => {
-  it('vuelve a la pregunta donde se quedó el usuario', async () => {
-    seedSession({ ideaId: IDEA_ID, stage: 'questions', questionIndex: 2, dynamicQuestionIndex: 0 });
-
-    mockApi({
-      'GET /questions': { questions: QUESTIONS },
-      'GET /ideas': (call) =>
-        call.url.includes('/respuestas')
-          ? { respuestas: answersFor(QUESTIONS, 2) }
-          : { idea: makeIdea() },
-    });
-
-    renderApp(<App />);
-
-    expect(await screen.findByText(/Pregunta 3 de 5/)).toBeInTheDocument();
-    expect(screen.getByText('Pregunta genérica 3')).toBeInTheDocument();
-  });
-
-  it('ignora sesiones corruptas y arranca en el listado', async () => {
-    localStorage.setItem('jarvis_session', 'no-es-json');
-    mockApi({ 'GET /ideas': { ideas: [] } });
-
-    renderApp(<App />);
-
-    expect(await screen.findByText('Todavía no tienes ideas.')).toBeInTheDocument();
-  });
-
-  it('no restaura una etapa de edición huérfana', async () => {
-    seedSession({
-      ideaId: IDEA_ID,
-      stage: 'questions-edit',
-      questionIndex: 1,
-      dynamicQuestionIndex: 0,
-    });
-    mockApi({ 'GET /ideas': { ideas: [] } });
-
-    renderApp(<App />);
-
-    expect(await screen.findByText('Todavía no tienes ideas.')).toBeInTheDocument();
   });
 });

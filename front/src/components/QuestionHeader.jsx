@@ -3,13 +3,13 @@ import { memo } from 'react';
 function QuestionHeader({ currentIndex, total, title }) {
   return (
     <>
-      <div style={{ marginBottom: '0.5rem', color: '#666', fontSize: '0.9rem' }}>
+      <div className="mb-2 font-body text-sm text-stone">
         {title} — Pregunta {currentIndex + 1} de {total}
       </div>
       <progress
         value={currentIndex + 1}
         max={total}
-        style={{ width: '100%', height: '8px', marginBottom: '1rem' }}
+        className="mb-4 h-1.5 w-full accent-amber"
       />
     </>
   );

@@ -167,6 +167,27 @@ describe('Plans E2E', () => {
     });
   });
 
+  test('POST /api/ideas/:id/generate-plan — si Groq da 429, avisa el límite diario en vez de un error genérico', async () => {
+    const rateLimitError = Object.assign(new Error('Rate limit reached'), {
+      status: 429,
+      headers: { get: (name) => (name === 'retry-after' ? '927' : null) },
+    });
+    groqCreate.mockRejectedValue(rateLimitError);
+
+    mockTables({
+      work_plans: { data: null },
+      ideas: { data: idea },
+      respuestas: { data: [] },
+      dynamic_respuestas: { data: [] },
+    });
+
+    const res = await request(app).post(`/api/ideas/${IDEA_ID}/generate-plan`);
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toMatch(/límite diario/);
+    expect(res.body.message).toMatch(/16 minutos/);
+  });
+
   test('GET /api/plans/:plan_id/epicas — lista épicas ordenadas', async () => {
     mockTables({
       epicas: {
@@ -249,5 +270,35 @@ describe('Plans E2E', () => {
 
     expect(ok.status).toBe(200);
     expect(ok.body.subtask.tiempo_estimado_min).toBe(30);
+  });
+
+  test('GET /api/plans — lista todos los planes de todas las ideas, con epicas_count', async () => {
+    mockTables({
+      work_plans: {
+        data: [
+          {
+            id: PLAN_ID,
+            idea_id: IDEA_ID,
+            created_at: '2026-07-20T00:00:00Z',
+            ideas: { titulo: 'Paseador de perros', texto_idea: idea.texto_idea },
+          },
+        ],
+      },
+      epicas: { data: [{ id: EPICA_ID, plan_id: PLAN_ID }] },
+    });
+
+    const res = await request(app).get('/api/plans');
+
+    expect(res.status).toBe(200);
+    expect(res.body.plans).toEqual([
+      {
+        id: PLAN_ID,
+        idea_id: IDEA_ID,
+        created_at: '2026-07-20T00:00:00Z',
+        idea_titulo: 'Paseador de perros',
+        idea_texto: idea.texto_idea,
+        epicas_count: 1,
+      },
+    ]);
   });
 });

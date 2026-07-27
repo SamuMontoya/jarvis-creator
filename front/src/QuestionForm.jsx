@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import QuestionHeader from './components/QuestionHeader';
 import QuestionCard from './components/QuestionCard';
 import Spinner from './components/Spinner';
@@ -6,19 +7,15 @@ import ErrorMessage from './components/ErrorMessage';
 import { useApp } from './context/AppContext';
 import { useToast } from './context/ToastContext';
 import { api } from './api';
-import { ERRORS, SUCCESS, MIN_ANSWER_LENGTH, STAGES } from './constants';
+import { ERRORS, SUCCESS, MIN_ANSWER_LENGTH, routes } from './constants';
 
-function QuestionForm({ editMode = false }) {
-  const {
-    ideaId,
-    questionIndex,
-    setQuestionIndex,
-    setTotalQuestions,
-    goToResumen,
-    goToIdeas,
-    finishEditing,
-    editingReturnStage,
-  } = useApp();
+function QuestionForm() {
+  const { ideaId } = useParams();
+  const [searchParams] = useSearchParams();
+  const editMode = searchParams.get('editar') === '1';
+  const navigate = useNavigate();
+  const { questionIndex, setQuestionIndex, setTotalQuestions, finishEditing, editingReturnPath } =
+    useApp();
   const { notify } = useToast();
 
   const [questions, setQuestions] = useState([]);
@@ -90,7 +87,7 @@ function QuestionForm({ editMode = false }) {
       if (editMode) {
         finishEditing();
       } else if (isLastQuestion) {
-        goToResumen();
+        navigate(routes.resumen(ideaId));
       } else {
         setQuestionIndex(questionIndex + 1);
       }
@@ -117,9 +114,9 @@ function QuestionForm({ editMode = false }) {
 
   if (questions.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
-        <p>No hay preguntas disponibles.</p>
-        <button onClick={goToIdeas} style={{ padding: '0.75rem 1.5rem', cursor: 'pointer' }}>
+      <div className="px-4 py-12 text-center text-stone">
+        <p className="font-body">No hay preguntas disponibles.</p>
+        <button onClick={() => navigate(routes.home())} className="ds-btn ds-btn-outline mt-3">
           Volver a mis ideas
         </button>
       </div>
@@ -127,11 +124,10 @@ function QuestionForm({ editMode = false }) {
   }
 
   const nextDisabled = saving || !trimmed || isTooShort;
-  const backLabel =
-    editingReturnStage === STAGES.FINAL_RESUME ? 'Volver al resumen final' : 'Volver al resumen';
+  const backLabel = editingReturnPath === routes.idea(ideaId) ? 'Volver a la idea' : 'Volver al resumen';
 
   return (
-    <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem' }}>
+    <div className="mx-auto max-w-[700px]">
       <QuestionHeader
         currentIndex={questionIndex}
         total={questions.length}
@@ -146,34 +142,22 @@ function QuestionForm({ editMode = false }) {
       />
 
       <div
-        style={{
-          fontSize: '0.85rem',
-          color: trimmed && isTooShort ? '#dc3545' : '#666',
-          marginTop: '0.25rem',
-        }}
+        className="mt-1 font-body text-xs"
+        style={{ color: trimmed && isTooShort ? 'var(--color-danger)' : 'var(--color-stone)' }}
       >
         {trimmed.length}/{MIN_ANSWER_LENGTH} caracteres mínimos
       </div>
 
-      <div style={{ marginTop: '1rem' }}>
+      <div className="mt-4">
         <ErrorMessage message={error} />
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+      <div className="mt-4 flex gap-4">
         <button
           type="button"
           onClick={handlePrevious}
           disabled={saving || (!editMode && isFirstQuestion)}
-          style={{
-            flex: 1,
-            padding: '0.75rem 1.5rem',
-            fontSize: '1rem',
-            backgroundColor: saving || (!editMode && isFirstQuestion) ? '#ccc' : '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: saving || (!editMode && isFirstQuestion) ? 'not-allowed' : 'pointer',
-          }}
+          className="ds-btn ds-btn-outline flex-1"
         >
           {editMode ? backLabel : 'Anterior'}
         </button>
@@ -181,16 +165,7 @@ function QuestionForm({ editMode = false }) {
           type="button"
           onClick={handleNext}
           disabled={nextDisabled}
-          style={{
-            flex: 1,
-            padding: '0.75rem 1.5rem',
-            fontSize: '1rem',
-            backgroundColor: nextDisabled ? '#ccc' : isLastQuestion ? '#dc3545' : '#28a745',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: nextDisabled ? 'not-allowed' : 'pointer',
-          }}
+          className={`ds-btn flex-1 ${isLastQuestion ? 'ds-btn-ink' : 'ds-btn-amber'}`}
         >
           {saving ? 'Guardando...' : editMode ? 'Guardar' : isLastQuestion ? 'Ir a Resumen' : 'Siguiente'}
         </button>

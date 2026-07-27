@@ -3,6 +3,8 @@ import {
   MESSAGES,
   MIN_IDEA_LENGTH,
   MIN_ANSWER_LENGTH,
+  MIN_TITULO_LENGTH,
+  MAX_TITULO_LENGTH,
   EPICA_ESTADOS,
   STORY_ESTADOS,
   TASK_ESTADOS,
@@ -18,6 +20,11 @@ const answer = z
   .min(MIN_ANSWER_LENGTH, `La respuesta debe tener al menos ${MIN_ANSWER_LENGTH} caracteres`);
 
 export const ideaSchema = z.object({
+  titulo: z
+    .string()
+    .trim()
+    .min(MIN_TITULO_LENGTH, `El título debe tener al menos ${MIN_TITULO_LENGTH} caracteres`)
+    .max(MAX_TITULO_LENGTH, `El título no puede superar los ${MAX_TITULO_LENGTH} caracteres`),
   texto_idea: z
     .string()
     .trim()
@@ -37,7 +44,18 @@ export const dynamicRespuestaSchema = z.object({
 });
 
 export const updateIdeaSchema = z.object({
-  estado: z.enum(['draft', 'refined'], 'estado debe ser "draft" o "refined"'),
+  estado: z.enum(['draft', 'refined'], 'estado debe ser "draft" o "refined"').optional(),
+  titulo: z
+    .string()
+    .trim()
+    .min(MIN_TITULO_LENGTH, `El título debe tener al menos ${MIN_TITULO_LENGTH} caracteres`)
+    .max(MAX_TITULO_LENGTH, `El título no puede superar los ${MAX_TITULO_LENGTH} caracteres`)
+    .optional(),
+  texto_idea: z
+    .string()
+    .trim()
+    .min(MIN_IDEA_LENGTH, `La idea debe tener al menos ${MIN_IDEA_LENGTH} caracteres`)
+    .optional(),
 });
 
 export const ideaIdParamSchema = z.object({

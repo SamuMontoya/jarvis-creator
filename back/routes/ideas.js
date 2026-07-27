@@ -17,7 +17,30 @@ router.get('/ideas', async (req, res, next) => {
       return sendDbError(res, error, 'GET /ideas');
     }
 
-    res.json({ status: 'ok', ideas: data || [] });
+    const ideas = data || [];
+    const ideaIds = ideas.map((idea) => idea.id);
+
+    // Attach plan_id per idea so the ideas list can offer a direct "view
+    // plan" action without a click-through-and-hope: the button only ever
+    // appears when a plan for THAT idea actually exists.
+    let planIdByIdea = {};
+    if (ideaIds.length > 0) {
+      const { data: plans, error: plansError } = await supabase
+        .from('work_plans')
+        .select('id, idea_id')
+        .in('idea_id', ideaIds);
+
+      if (plansError) {
+        return sendDbError(res, plansError, 'GET /ideas (plans)');
+      }
+
+      planIdByIdea = Object.fromEntries((plans || []).map((p) => [p.idea_id, p.id]));
+    }
+
+    res.json({
+      status: 'ok',
+      ideas: ideas.map((idea) => ({ ...idea, plan_id: planIdByIdea[idea.id] ?? null })),
+    });
   } catch (err) {
     next(err);
   }
@@ -35,7 +58,7 @@ router.post('/ideas', async (req, res, next) => {
 
     const { data, error } = await supabase
       .from('ideas')
-      .insert([{ texto_idea: validation.data.texto_idea }])
+      .insert([{ titulo: validation.data.titulo, texto_idea: validation.data.texto_idea }])
       .select()
       .single();
 
@@ -103,9 +126,20 @@ router.patch('/ideas/:id', async (req, res, next) => {
       });
     }
 
+    const updates = Object.fromEntries(
+      Object.entries(validation.data).filter(([, value]) => value !== undefined)
+    );
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        status: 'error',
+        message: MESSAGES.INVALID_INPUT,
+      });
+    }
+
     const { data, error } = await supabase
       .from('ideas')
-      .update({ estado: validation.data.estado })
+      .update(updates)
       .eq('id', req.params.id)
       .select()
       .maybeSingle();

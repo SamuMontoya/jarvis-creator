@@ -10,7 +10,7 @@ export const DYNAMIC_QUESTIONS_COUNT = 10;
 // Orden fijo de frentes dentro de cada user story: una task por frente, en este orden.
 export const PLAN_FRENTES = ['definicion', 'ux_ui', 'frontend', 'backend', 'testing', 'devops'];
 
-export const PLAN_MAX_TOKENS = 20000;
+export const PLAN_MAX_TOKENS = 10000;
 
 export const EPICA_ESTADOS = ['pendiente', 'en_progreso', 'completada'];
 
@@ -24,6 +24,8 @@ export const MAX_SUBTASK_MINUTOS = 30;
 
 export const MIN_IDEA_LENGTH = 10;
 export const MIN_ANSWER_LENGTH = 5;
+export const MIN_TITULO_LENGTH = 3;
+export const MAX_TITULO_LENGTH = 80;
 
 export const HTTP_STATUS = {
   OK: 200,

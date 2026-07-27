@@ -1,24 +1,34 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ErrorMessage from './components/ErrorMessage';
 import { useApp } from './context/AppContext';
 import { useToast } from './context/ToastContext';
 import { api } from './api';
-import { ERRORS, SUCCESS, MIN_IDEA_LENGTH } from './constants';
+import { ERRORS, SUCCESS, MIN_IDEA_LENGTH, MIN_TITULO_LENGTH, routes } from './constants';
 
 function IdeaForm() {
-  const { startQuestions, setIdeaText, goToIdeas } = useApp();
+  const { setIdeaText } = useApp();
   const { notify } = useToast();
+  const navigate = useNavigate();
 
+  const [titulo, setTitulo] = useState('');
   const [texto_idea, setTextoIdea] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const trimmedTitulo = titulo.trim();
   const trimmed = texto_idea.trim();
+  const isTitleTooShort = trimmedTitulo.length < MIN_TITULO_LENGTH;
   const isTooShort = trimmed.length < MIN_IDEA_LENGTH;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+
+    if (!trimmedTitulo) {
+      setError(ERRORS.IDEA_TITLE_EMPTY);
+      return;
+    }
 
     if (!trimmed) {
       setError(ERRORS.IDEA_EMPTY);
@@ -32,11 +42,10 @@ function IdeaForm() {
 
     setLoading(true);
     try {
-      const data = await api.createIdea(trimmed);
-      setIdeaText(trimmed);
-      setTextoIdea('');
+      const data = await api.createIdea(trimmedTitulo, trimmed);
+      setIdeaText(trimmedTitulo);
       notify(SUCCESS.IDEA_CREATED);
-      startQuestions(data.idea.id);
+      navigate(routes.preguntas(data.idea.id));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -44,12 +53,33 @@ function IdeaForm() {
     }
   };
 
-  const disabled = loading || !trimmed || isTooShort;
+  const disabled = loading || !trimmedTitulo || isTitleTooShort || !trimmed || isTooShort;
 
   return (
-    <form onSubmit={handleSubmit} style={{ maxWidth: '600px', margin: '2rem auto', padding: '1rem' }}>
-      <label htmlFor="idea-input" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
-        ¿Qué idea quieres construir?
+    <form onSubmit={handleSubmit} className="mx-auto max-w-[600px]">
+      <span className="ds-eyebrow">Nueva idea</span>
+      <h1 className="m-0 mb-6 mt-1 font-display text-2xl font-bold text-ink">
+        Cuéntanos qué quieres construir
+      </h1>
+
+      <label htmlFor="idea-titulo" className="mb-2 block font-body text-sm font-medium text-ink">
+        Título
+      </label>
+      <input
+        id="idea-titulo"
+        type="text"
+        value={titulo}
+        onChange={(e) => setTitulo(e.target.value)}
+        placeholder="Ej. Paseador de perros"
+        disabled={loading}
+        className="ds-input mb-1"
+      />
+      <div className="mb-4 font-body text-xs text-stone">
+        {trimmedTitulo.length}/{MIN_TITULO_LENGTH} caracteres mínimos
+      </div>
+
+      <label htmlFor="idea-input" className="mb-2 block font-body text-sm font-medium text-ink">
+        Descripción
       </label>
       <textarea
         id="idea-input"
@@ -58,53 +88,27 @@ function IdeaForm() {
         placeholder="¿Qué idea quieres construir?"
         rows={4}
         disabled={loading}
-        style={{
-          width: '100%',
-          padding: '0.75rem',
-          fontSize: '1rem',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          resize: 'vertical',
-          boxSizing: 'border-box',
-        }}
+        className="ds-input"
       />
-      <div style={{ fontSize: '0.85rem', color: isTooShort && trimmed ? '#dc3545' : '#666', marginTop: '0.25rem' }}>
+      <div
+        className="mt-1 font-body text-xs"
+        style={{ color: isTooShort && trimmed ? 'var(--color-danger)' : 'var(--color-stone)' }}
+      >
         {trimmed.length}/{MIN_IDEA_LENGTH} caracteres mínimos
       </div>
 
       <ErrorMessage message={error} />
 
-      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem' }}>
+      <div className="mt-3 flex gap-3">
         <button
           type="button"
-          onClick={goToIdeas}
+          onClick={() => navigate(routes.home())}
           disabled={loading}
-          style={{
-            padding: '0.75rem 1.5rem',
-            fontSize: '1rem',
-            backgroundColor: 'white',
-            color: '#495057',
-            border: '1px solid #ced4da',
-            borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}
+          className="ds-btn ds-btn-outline"
         >
           Volver
         </button>
-        <button
-          type="submit"
-          disabled={disabled}
-          style={{
-            flex: 1,
-            padding: '0.75rem 1.5rem',
-            fontSize: '1rem',
-            backgroundColor: disabled ? '#ccc' : '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: disabled ? 'not-allowed' : 'pointer',
-          }}
-        >
+        <button type="submit" disabled={disabled} className="ds-btn ds-btn-amber flex-1">
           {loading ? 'Enviando...' : 'Enviar'}
         </button>
       </div>

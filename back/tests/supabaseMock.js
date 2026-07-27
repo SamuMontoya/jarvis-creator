@@ -20,7 +20,9 @@ function createQuery(table, resolve, calls) {
     update: record('update'),
     delete: record('delete'),
     eq: record('eq'),
+    in: record('in'),
     order: record('order'),
+    limit: record('limit'),
     single: record('single'),
     maybeSingle: record('maybeSingle'),
     then(onFulfilled, onRejected) {

@@ -71,7 +71,7 @@ describe('rutas desconocidas', () => {
 
 describe('GET /api/ideas', () => {
   it('devuelve las ideas ordenadas por updated_at descendente', async () => {
-    mockTables({ ideas: { data: [idea] } });
+    mockTables({ ideas: { data: [idea] }, work_plans: { data: [] } });
 
     const res = await request(app).get('/api/ideas');
 
@@ -97,7 +97,9 @@ describe('GET /api/ideas', () => {
 
 describe('POST /api/ideas', () => {
   it('rechaza ideas por debajo del mínimo con un mensaje específico', async () => {
-    const res = await request(app).post('/api/ideas').send({ texto_idea: 'corta' });
+    const res = await request(app)
+      .post('/api/ideas')
+      .send({ titulo: 'Un título válido', texto_idea: 'corta' });
 
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/al menos 10 caracteres/);
@@ -113,10 +115,12 @@ describe('POST /api/ideas', () => {
 
     const res = await request(app)
       .post('/api/ideas')
-      .send({ texto_idea: '   Una app para pasear perros   ' });
+      .send({ titulo: '  Paseador de perros  ', texto_idea: '   Una app para pasear perros   ' });
 
     expect(res.status).toBe(201);
-    expect(values(lastCall('ideas'))).toEqual([{ texto_idea: 'Una app para pasear perros' }]);
+    expect(values(lastCall('ideas'))).toEqual([
+      { titulo: 'Paseador de perros', texto_idea: 'Una app para pasear perros' },
+    ]);
   });
 });
 

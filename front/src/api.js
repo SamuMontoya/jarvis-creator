@@ -37,11 +37,18 @@ export const api = {
 
   getIdea: (ideaId) => request(`/ideas/${ideaId}`, { fallbackError: ERRORS.LOAD_RESUMEN }),
 
-  createIdea: (texto_idea) =>
-    request('/ideas', { method: 'POST', body: { texto_idea }, fallbackError: ERRORS.CREATE_IDEA }),
+  createIdea: (titulo, texto_idea) =>
+    request('/ideas', {
+      method: 'POST',
+      body: { titulo, texto_idea },
+      fallbackError: ERRORS.CREATE_IDEA,
+    }),
 
   updateIdeaState: (ideaId, estado) =>
     request(`/ideas/${ideaId}`, { method: 'PATCH', body: { estado }, fallbackError: ERRORS.UPDATE_IDEA }),
+
+  updateIdea: (ideaId, payload) =>
+    request(`/ideas/${ideaId}`, { method: 'PATCH', body: payload, fallbackError: ERRORS.UPDATE_IDEA }),
 
   deleteIdea: (ideaId) =>
     request(`/ideas/${ideaId}`, { method: 'DELETE', fallbackError: ERRORS.DELETE_IDEA }),
@@ -75,23 +82,22 @@ export const api = {
       fallbackError: ERRORS.GENERATE_DOCUMENT,
     }),
 
-  generatePlan: (ideaId) =>
-    request(`/ideas/${ideaId}/generate-plan`, {
+  generatePlan: (ideaId, { force = false } = {}) =>
+    request(`/ideas/${ideaId}/generate-plan${force ? '?force=true' : ''}`, {
       method: 'POST',
       fallbackError: ERRORS.GENERATE_PLAN,
     }),
 
-  getEpicas: (planId) =>
-    request(`/plans/${planId}/epicas`, { fallbackError: ERRORS.LOAD_PLAN }),
+  getPlanForIdea: (ideaId) =>
+    request(`/ideas/${ideaId}/plan`, { fallbackError: ERRORS.LOAD_PLAN }),
 
-  getStories: (epicaId) =>
-    request(`/epicas/${epicaId}/stories`, { fallbackError: ERRORS.LOAD_PLAN }),
+  getPlansForIdea: (ideaId) =>
+    request(`/ideas/${ideaId}/plans`, { fallbackError: ERRORS.LOAD_PLANS }),
 
-  getTasks: (storyId) =>
-    request(`/stories/${storyId}/tasks`, { fallbackError: ERRORS.LOAD_PLAN }),
+  listAllPlans: () => request('/plans', { fallbackError: ERRORS.LOAD_PLANS }),
 
-  getSubtasks: (taskId) =>
-    request(`/tasks/${taskId}/subtasks`, { fallbackError: ERRORS.LOAD_PLAN }),
+  getFullPlan: (planId) =>
+    request(`/plans/${planId}/full`, { fallbackError: ERRORS.LOAD_PLAN }),
 
   updateEpica: (epicaId, payload) =>
     request(`/epicas/${epicaId}`, {

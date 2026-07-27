@@ -5,23 +5,12 @@ function ResumenItem({ index, pregunta, respuesta, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      style={{
-        display: 'block',
-        width: '100%',
-        textAlign: 'left',
-        marginBottom: '1.5rem',
-        padding: '1rem',
-        border: '1px solid #ddd',
-        borderRadius: '4px',
-        backgroundColor: '#fafafa',
-        cursor: 'pointer',
-        font: 'inherit',
-      }}
+      className="ds-card mb-4 block w-full cursor-pointer p-4 text-left transition-opacity hover:opacity-80"
     >
-      <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', color: '#333' }}>
+      <div className="mb-2 font-display text-sm font-bold text-ink">
         {index + 1}. {pregunta}
       </div>
-      <div style={{ whiteSpace: 'pre-wrap', color: '#555' }}>{respuesta}</div>
+      <div className="whitespace-pre-wrap font-body text-sm text-stone">{respuesta}</div>
     </button>
   );
 }

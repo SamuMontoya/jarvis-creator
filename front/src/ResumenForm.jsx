@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import SeccionRespuestas from './components/SeccionRespuestas';
 import Spinner from './components/Spinner';
 import ErrorMessage from './components/ErrorMessage';
 import { useApp } from './context/AppContext';
 import { api } from './api';
-import { QUESTION_TYPES } from './constants';
+import { QUESTION_TYPES, routes } from './constants';
 
 function ResumenForm() {
-  const { ideaId, editQuestion, startDynamicQuestions, backToLastQuestion } = useApp();
+  const { ideaId } = useParams();
+  const navigate = useNavigate();
+  const { editQuestion, setQuestionIndex, setDynamicQuestionIndex, totalQuestions } = useApp();
 
   const [idea, setIdea] = useState(null);
   const [respuestas, setRespuestas] = useState([]);
@@ -50,9 +53,19 @@ function ResumenForm() {
   );
 
   const handleEdit = useCallback(
-    (index) => editQuestion(QUESTION_TYPES.GENERIC, index),
-    [editQuestion]
+    (index) => editQuestion(ideaId, QUESTION_TYPES.GENERIC, index, routes.resumen(ideaId)),
+    [editQuestion, ideaId]
   );
+
+  const handleBackToQuestions = useCallback(() => {
+    setQuestionIndex(Math.max(0, totalQuestions - 1));
+    navigate(routes.preguntas(ideaId));
+  }, [setQuestionIndex, totalQuestions, navigate, ideaId]);
+
+  const handleStartDynamic = useCallback(() => {
+    setDynamicQuestionIndex(0);
+    navigate(routes.analisis(ideaId));
+  }, [setDynamicQuestionIndex, navigate, ideaId]);
 
   if (loading) return <Spinner label="Cargando resumen..." />;
 
@@ -61,19 +74,14 @@ function ResumenForm() {
   if (!idea) return <ErrorMessage message="No se encontró la idea." onRetry={load} />;
 
   return (
-    <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem' }}>
-      <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Resumen de tu idea</h2>
+    <div className="mx-auto max-w-[700px]">
+      <h2 className="mb-6 text-center font-display text-2xl font-bold text-ink">
+        Resumen de tu idea
+      </h2>
 
-      <div
-        style={{
-          marginBottom: '1.5rem',
-          padding: '1rem',
-          backgroundColor: '#f5f5f5',
-          borderRadius: '8px',
-        }}
-      >
-        <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Tu idea:</h3>
-        <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{idea.texto_idea}</p>
+      <div className="mb-6 border-l-2 border-amber bg-paper-warm px-4 py-4">
+        <h3 className="ds-label mb-1 mt-0">{idea.titulo || 'Tu idea'}</h3>
+        <p className="m-0 whitespace-pre-wrap font-body text-ink">{idea.texto_idea}</p>
       </div>
 
       <SeccionRespuestas
@@ -84,46 +92,15 @@ function ResumenForm() {
         onEdit={handleEdit}
       />
 
-      <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem' }}>
+      <p className="text-center font-body text-sm text-stone">
         Toca cualquier respuesta para editarla.
       </p>
 
-      <div
-        style={{
-          display: 'flex',
-          gap: '1rem',
-          justifyContent: 'center',
-          marginTop: '2rem',
-          flexWrap: 'wrap',
-        }}
-      >
-        <button
-          onClick={backToLastQuestion}
-          style={{
-            padding: '0.75rem 1.5rem',
-            fontSize: '1rem',
-            backgroundColor: 'white',
-            color: '#495057',
-            border: '1px solid #ced4da',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
+      <div className="mt-8 flex flex-wrap justify-center gap-4">
+        <button onClick={handleBackToQuestions} className="ds-btn ds-btn-outline">
           Volver a las preguntas
         </button>
-        <button
-          onClick={startDynamicQuestions}
-          style={{
-            padding: '0.75rem 1.75rem',
-            fontSize: '1rem',
-            fontWeight: 'bold',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
+        <button onClick={handleStartDynamic} className="ds-btn ds-btn-amber">
           Continuar al análisis profundo
         </button>
       </div>

@@ -5,13 +5,11 @@ import userEvent from '@testing-library/user-event';
 import QuestionCard from '../src/components/QuestionCard';
 import QuestionHeader from '../src/components/QuestionHeader';
 import ResumenItem from '../src/components/ResumenItem';
-import IdeaCard from '../src/components/IdeaCard';
 import TabsFiltro from '../src/components/TabsFiltro';
 import ConfirmDialog from '../src/components/ConfirmDialog';
 import ErrorMessage from '../src/components/ErrorMessage';
 import Spinner from '../src/components/Spinner';
 import SeccionRespuestas from '../src/components/SeccionRespuestas';
-import BotonesDescarga from '../src/components/BotonesDescarga';
 import { makeIdea } from './helpers';
 
 describe('QuestionHeader', () => {
@@ -57,61 +55,6 @@ describe('ResumenItem', () => {
     expect(screen.getByText('1. ¿Problema?')).toBeInTheDocument();
     await user.click(screen.getByRole('button'));
     expect(onClick).toHaveBeenCalledOnce();
-  });
-});
-
-describe('IdeaCard', () => {
-  const formatDate = () => '01/07/2026';
-
-  it('etiqueta las ideas refinadas como completadas', () => {
-    render(
-      <IdeaCard
-        idea={makeIdea({ estado: 'refined' })}
-        onContinue={() => {}}
-        onDelete={() => {}}
-        deletingId={null}
-        formatDate={formatDate}
-      />
-    );
-
-    expect(screen.getByText('Completada')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ver' })).toBeInTheDocument();
-  });
-
-  it('pasa el id de la idea al pedir borrado', async () => {
-    const onDelete = vi.fn();
-    const user = userEvent.setup();
-    const idea = makeIdea();
-
-    render(
-      <IdeaCard
-        idea={idea}
-        onContinue={() => {}}
-        onDelete={onDelete}
-        deletingId={null}
-        formatDate={formatDate}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Eliminar' }));
-    expect(onDelete).toHaveBeenCalledWith(idea.id);
-  });
-
-  it('bloquea ambos botones mientras se elimina', () => {
-    const idea = makeIdea();
-
-    render(
-      <IdeaCard
-        idea={idea}
-        onContinue={() => {}}
-        onDelete={() => {}}
-        deletingId={idea.id}
-        formatDate={formatDate}
-      />
-    );
-
-    expect(screen.getByRole('button', { name: 'Eliminando...' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Continuar' })).toBeDisabled();
   });
 });
 
@@ -235,21 +178,5 @@ describe('SeccionRespuestas', () => {
 
     await user.click(screen.getByText('2. P2'));
     expect(onEdit).toHaveBeenCalledWith(1);
-  });
-});
-
-describe('BotonesDescarga', () => {
-  it('deshabilita todas las descargas mientras genera', () => {
-    render(<BotonesDescarga onBack={() => {}} onDownloadMarkdown={() => {}} loading />);
-
-    screen.getAllByRole('button').forEach((button) => expect(button).toBeDisabled());
-  });
-
-  it('solo expone Markdown, sin HTML ni PDF', () => {
-    render(<BotonesDescarga onBack={() => {}} onDownloadMarkdown={() => {}} />);
-
-    expect(screen.getByRole('button', { name: /Descargar Markdown/ })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: /Descargar HTML/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Descargar PDF/ })).not.toBeInTheDocument();
   });
 });

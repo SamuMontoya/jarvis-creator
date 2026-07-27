@@ -4,30 +4,14 @@ function ErrorMessage({ message, onRetry, retryLabel = 'Reintentar' }) {
   return (
     <div
       role="alert"
-      style={{
-        padding: '1rem',
-        marginBottom: '1rem',
-        backgroundColor: '#ffe6e6',
-        border: '1px solid #f5c2c7',
-        borderRadius: '8px',
-        color: '#842029',
-        textAlign: 'center',
-      }}
+      className="mb-4 border-l-2 px-4 py-3 text-center"
+      style={{ borderColor: 'var(--color-danger)', backgroundColor: 'var(--color-paper-warm)' }}
     >
-      <p style={{ margin: 0 }}>{message}</p>
+      <p className="m-0 font-body text-sm" style={{ color: 'var(--color-danger)' }}>
+        {message}
+      </p>
       {onRetry && (
-        <button
-          onClick={onRetry}
-          style={{
-            marginTop: '0.75rem',
-            padding: '0.5rem 1.25rem',
-            border: 'none',
-            borderRadius: '4px',
-            backgroundColor: '#dc3545',
-            color: 'white',
-            cursor: 'pointer',
-          }}
-        >
+        <button onClick={onRetry} className="ds-btn ds-btn-danger-outline mt-3 !py-2 !px-4 !text-[0.7rem]">
           {retryLabel}
         </button>
       )}

@@ -105,7 +105,7 @@ describe('logger', () => {
 
 describe('firstValidationMessage', () => {
   it('extrae el mensaje de zod v4 desde .issues', () => {
-    const result = ideaSchema.safeParse({ texto_idea: 'corta' });
+    const result = ideaSchema.safeParse({ titulo: 'Un título válido', texto_idea: 'corta' });
 
     expect(firstValidationMessage(result.error)).toMatch(/al menos 10 caracteres/);
   });

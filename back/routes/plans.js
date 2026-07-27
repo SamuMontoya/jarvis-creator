@@ -17,14 +17,17 @@ import {
 import { HTTP_STATUS, MESSAGES, GROQ_MODEL, PLAN_FRENTES, PLAN_MAX_TOKENS } from '../config.js';
 import { sendDbError } from '../errorHandler.js';
 import { logger } from '../logger.js';
+import { formatGroqError } from '../groqErrors.js';
 
 const router = express.Router();
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const SYSTEM_PROMPT =
-  'Eres un experto product manager y arquitecto de software. Descompones ideas de ' +
-  'negocio en backlogs de desarrollo completos, accionables y en formato JSON estricto.';
+  'Eres un experto product manager y arquitecto de software senior. Descompones ideas de ' +
+  'negocio en backlogs de desarrollo completos, accionables y en formato JSON estricto. ' +
+  'Cada task y subtask debe ser concreta, ejecutable en ≤30 min, y contener detalles ' +
+  'técnicos específicos (nombres de tablas, endpoints, queries, comandos, archivos).';
 
 const buildPrompt = (idea, genRespuestas, dynRespuestas) => `Genera un backlog de desarrollo completo para esta idea de negocio.
 
@@ -42,7 +45,19 @@ INSTRUCCIONES:
 - Por cada user story, genera EXACTAMENTE 6 tasks, una por cada frente, EN ESTE ORDEN EXACTO:
   definicion, ux_ui, frontend, backend, testing, devops.
 - Por cada task, genera de 2 a 3 subtasks. Cada subtask debe ser ejecutable en 30 minutos o
-  menos, hiper específica y accionable.
+  menos, HIPER ESPECÍFICA Y ACCIONABLE.
+
+REGLAS DE ESPECIFICIDAD PARA SUBTASKS (OBLIGATORIO):
+- NO uses frases genéricas como "Implementar X", "Crear componente Y", "Configurar Z".
+- SÍ incluye: nombres exactos de archivos, endpoints HTTP (METHOD /path), queries SQL (CREATE TABLE, ALTER, INDEX), comandos CLI, variables de entorno, nombres de componentes React, hooks, servicios, tipos TypeScript, middlewares, pipelines CI/CD.
+- Ejemplos de subtasks BIEN hechas:
+  * "Crear migración SQL: CREATE TABLE usuarios (id UUID PRIMARY KEY, email VARCHAR UNIQUE, password_hash TEXT, creado_en TIMESTAMPTZ DEFAULT NOW())"
+  * "Añadir endpoint POST /api/auth/login en backend/routes/auth.js: validar body con zod, llamar a authService.login(email, password), devolver { token, user }"
+  * "Crear componente React src/components/LoginForm.tsx: formulario con email/password, usar react-hook-form, llamar a useAuth().login(), manejar errores 401"
+  * "Configurar GitHub Actions .github/workflows/ci.yml: job test con npm test, job build con npm run build, trigger en push a main"
+  * "Añadir variable de entorno JWT_SECRET en .env.example y documentar en README.md sección 'Configuración'"
+  * "Escribir test de integración tests/auth.test.js: POST /api/auth/login con credenciales válidas → 200 + token JWT"
+  * "Crear hook personalizado src/hooks/useAuth.ts: estado user/token en localStorage, funciones login/logout, tipado TypeScript"
 - Todo el contenido debe estar en español.
 - El backlog debe ser LINEAL: sin dependencias paralelas entre épicas, stories o tasks.
 - Responde SOLO JSON válido, sin markdown ni explicación, con esta forma exacta:
@@ -176,20 +191,27 @@ router.post('/ideas/:id/generate-plan', async (req, res, next) => {
     }
 
     const { id } = paramsValidation.data;
+    const force = req.query.force === 'true';
 
-    // Generation is expensive and non-deterministic: reuse what's already stored.
-    const { data: existingPlan, error: existingError } = await supabase
-      .from('work_plans')
-      .select('id')
-      .eq('idea_id', id)
-      .maybeSingle();
+    // Generation is expensive and non-deterministic: without force, reuse the
+    // most recent version already stored. With force, a NEW version is
+    // created and the previous ones are kept as history (never deleted).
+    if (!force) {
+      const { data: existingPlan, error: existingError } = await supabase
+        .from('work_plans')
+        .select('id')
+        .eq('idea_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (existingError) {
-      return sendDbError(res, existingError, 'generate-plan (existing lookup)');
-    }
+      if (existingError) {
+        return sendDbError(res, existingError, 'generate-plan (existing lookup)');
+      }
 
-    if (existingPlan) {
-      return res.json({ status: 'ok', plan_id: existingPlan.id, already_exists: true });
+      if (existingPlan) {
+        return res.json({ status: 'ok', plan_id: existingPlan.id, already_exists: true });
+      }
     }
 
     const { data: idea, error: ideaError } = await supabase
@@ -233,9 +255,10 @@ router.post('/ideas/:id/generate-plan', async (req, res, next) => {
       plan = await askGroqForPlan(idea, genRespuestas || [], dynRespuestas || []);
     } catch (groqError) {
       logger.error('Groq plan generation failed', groqError);
-      return res
-        .status(HTTP_STATUS.SERVER_ERROR)
-        .json({ status: 'error', message: MESSAGES.PLAN_GROQ_ERROR });
+      return res.status(HTTP_STATUS.SERVER_ERROR).json({
+        status: 'error',
+        message: formatGroqError(groqError, MESSAGES.PLAN_GROQ_ERROR),
+      });
     }
 
     const workPlan = await insertRow('work_plans', { idea_id: id });
@@ -246,6 +269,232 @@ router.post('/ideas/:id/generate-plan', async (req, res, next) => {
     res.status(HTTP_STATUS.CREATED).json({ status: 'ok', plan_id: workPlan.id, ...counts });
   } catch (err) {
     logger.error('POST /ideas/:id/generate-plan failed', err);
+    next(err);
+  }
+});
+
+router.get('/ideas/:id/plan', async (req, res, next) => {
+  try {
+    const paramsValidation = ideaIdParamSchema.safeParse(req.params);
+    if (!paramsValidation.success) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        status: 'error',
+        message: firstValidationMessage(paramsValidation.error),
+      });
+    }
+
+    const { id } = paramsValidation.data;
+
+    // "The" plan for an idea is its most recent version — older versions
+    // stay reachable through GET /ideas/:id/plans.
+    const { data: existingPlan, error: existingError } = await supabase
+      .from('work_plans')
+      .select('id')
+      .eq('idea_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      return sendDbError(res, existingError, 'get-plan-for-idea');
+    }
+
+    if (!existingPlan) {
+      return res.json({ status: 'ok', plan_id: null });
+    }
+
+    res.json({ status: 'ok', plan_id: existingPlan.id });
+  } catch (err) {
+    logger.error('GET /ideas/:id/plan failed', err);
+    next(err);
+  }
+});
+
+router.get('/plans', async (req, res, next) => {
+  try {
+    const { data: plans, error: plansError } = await supabase
+      .from('work_plans')
+      .select('id, idea_id, created_at, ideas(titulo, texto_idea)')
+      .order('created_at', { ascending: false });
+
+    if (plansError) {
+      return sendDbError(res, plansError, 'GET /plans');
+    }
+
+    const planIds = (plans || []).map((p) => p.id);
+    let epicasCountByPlan = {};
+
+    if (planIds.length > 0) {
+      const { data: epicasRows, error: epicasError } = await supabase
+        .from('epicas')
+        .select('id, plan_id')
+        .in('plan_id', planIds);
+
+      if (epicasError) {
+        return sendDbError(res, epicasError, 'GET /plans (epicas count)');
+      }
+
+      epicasCountByPlan = (epicasRows || []).reduce((acc, row) => {
+        acc[row.plan_id] = (acc[row.plan_id] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
+    res.json({
+      status: 'ok',
+      plans: (plans || []).map((plan) => ({
+        id: plan.id,
+        idea_id: plan.idea_id,
+        created_at: plan.created_at,
+        idea_titulo: plan.ideas?.titulo ?? null,
+        idea_texto: plan.ideas?.texto_idea ?? null,
+        epicas_count: epicasCountByPlan[plan.id] || 0,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/ideas/:id/plans', async (req, res, next) => {
+  try {
+    const paramsValidation = ideaIdParamSchema.safeParse(req.params);
+    if (!paramsValidation.success) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        status: 'error',
+        message: firstValidationMessage(paramsValidation.error),
+      });
+    }
+
+    const { id } = paramsValidation.data;
+
+    const { data: plans, error: plansError } = await supabase
+      .from('work_plans')
+      .select('id, created_at')
+      .eq('idea_id', id)
+      .order('created_at', { ascending: false });
+
+    if (plansError) {
+      return sendDbError(res, plansError, 'GET /ideas/:id/plans');
+    }
+
+    const planIds = (plans || []).map((p) => p.id);
+    let epicasCountByPlan = {};
+
+    if (planIds.length > 0) {
+      const { data: epicasRows, error: epicasError } = await supabase
+        .from('epicas')
+        .select('id, plan_id')
+        .in('plan_id', planIds);
+
+      if (epicasError) {
+        return sendDbError(res, epicasError, 'GET /ideas/:id/plans (epicas count)');
+      }
+
+      epicasCountByPlan = (epicasRows || []).reduce((acc, row) => {
+        acc[row.plan_id] = (acc[row.plan_id] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
+    res.json({
+      status: 'ok',
+      plans: (plans || []).map((plan) => ({
+        ...plan,
+        epicas_count: epicasCountByPlan[plan.id] || 0,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/plans/:plan_id/full', async (req, res, next) => {
+  try {
+    const paramsValidation = planIdParamSchema.safeParse(req.params);
+    if (!paramsValidation.success) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        status: 'error',
+        message: firstValidationMessage(paramsValidation.error),
+      });
+    }
+
+    const { plan_id: planId } = paramsValidation.data;
+
+    // One batched round trip per tree level instead of the old
+    // fetch-per-node waterfall (epica -> stories -> tasks -> subtasks, N+1
+    // all the way down): 4 queries total, however large the plan is.
+    const { data: epicas, error: epicasError } = await supabase
+      .from('epicas')
+      .select('*')
+      .eq('plan_id', planId)
+      .order('orden', { ascending: true });
+
+    if (epicasError) {
+      return sendDbError(res, epicasError, 'GET /plans/:plan_id/full (epicas)');
+    }
+
+    const epicaIds = (epicas || []).map((e) => e.id);
+    const { data: stories, error: storiesError } = epicaIds.length
+      ? await supabase
+          .from('user_stories')
+          .select('*')
+          .in('epica_id', epicaIds)
+          .order('orden', { ascending: true })
+      : { data: [], error: null };
+
+    if (storiesError) {
+      return sendDbError(res, storiesError, 'GET /plans/:plan_id/full (stories)');
+    }
+
+    const storyIds = (stories || []).map((s) => s.id);
+    const { data: tasks, error: tasksError } = storyIds.length
+      ? await supabase
+          .from('tasks')
+          .select('*')
+          .in('user_story_id', storyIds)
+          .order('orden', { ascending: true })
+      : { data: [], error: null };
+
+    if (tasksError) {
+      return sendDbError(res, tasksError, 'GET /plans/:plan_id/full (tasks)');
+    }
+
+    const taskIds = (tasks || []).map((t) => t.id);
+    const { data: subtasks, error: subtasksError } = taskIds.length
+      ? await supabase
+          .from('subtasks')
+          .select('*')
+          .in('task_id', taskIds)
+          .order('orden', { ascending: true })
+      : { data: [], error: null };
+
+    if (subtasksError) {
+      return sendDbError(res, subtasksError, 'GET /plans/:plan_id/full (subtasks)');
+    }
+
+    const groupBy = (rows, key) =>
+      (rows || []).reduce((acc, row) => {
+        (acc[row[key]] ||= []).push(row);
+        return acc;
+      }, {});
+
+    const subtasksByTask = groupBy(subtasks, 'task_id');
+    const tasksByStory = groupBy(
+      (tasks || []).map((task) => ({ ...task, subtasks: subtasksByTask[task.id] || [] })),
+      'user_story_id'
+    );
+    const storiesByEpica = groupBy(
+      (stories || []).map((story) => ({ ...story, tasks: tasksByStory[story.id] || [] })),
+      'epica_id'
+    );
+    const tree = (epicas || []).map((epica) => ({
+      ...epica,
+      stories: storiesByEpica[epica.id] || [],
+    }));
+
+    res.json({ status: 'ok', epicas: tree });
+  } catch (err) {
     next(err);
   }
 });

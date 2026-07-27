@@ -1,4 +1,5 @@
 import { render } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 import { AppProvider } from '../src/context/AppContext';
 import { ToastProvider } from '../src/context/ToastContext';
@@ -21,6 +22,7 @@ export const makeDynamicQuestions = (n = 10) =>
 
 export const makeIdea = (overrides = {}) => ({
   id: IDEA_ID,
+  titulo: 'Paseador de perros',
   texto_idea: 'Una app para pasear perros en Bogotá',
   estado: 'draft',
   created_at: '2026-07-01T10:00:00Z',
@@ -63,15 +65,14 @@ export function mockApi(routes) {
   return calls;
 }
 
-export const renderApp = (ui) =>
+export const renderApp = (ui, { initialEntries = ['/'] } = {}) =>
   render(
-    <ToastProvider>
-      <AppProvider>{ui}</AppProvider>
-    </ToastProvider>
+    <MemoryRouter initialEntries={initialEntries}>
+      <ToastProvider>
+        <AppProvider>{ui}</AppProvider>
+      </ToastProvider>
+    </MemoryRouter>
   );
-
-export const seedSession = (session) =>
-  localStorage.setItem('jarvis_session', JSON.stringify(session));
 
 export const silenceConsoleError = () =>
   vi.spyOn(console, 'error').mockImplementation(() => {});

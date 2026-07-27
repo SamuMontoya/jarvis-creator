@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import QuestionHeader from './components/QuestionHeader';
 import QuestionCard from './components/QuestionCard';
 import Spinner from './components/Spinner';
@@ -6,17 +7,14 @@ import ErrorMessage from './components/ErrorMessage';
 import { useApp } from './context/AppContext';
 import { useToast } from './context/ToastContext';
 import { api } from './api';
-import { ERRORS, SUCCESS, MIN_ANSWER_LENGTH } from './constants';
+import { ERRORS, SUCCESS, MIN_ANSWER_LENGTH, routes } from './constants';
 
-function DynamicQuestionForm({ editMode = false }) {
-  const {
-    ideaId,
-    dynamicQuestionIndex,
-    setDynamicQuestionIndex,
-    goToFinalResume,
-    goToResumen,
-    finishEditing,
-  } = useApp();
+function DynamicQuestionForm() {
+  const { ideaId } = useParams();
+  const [searchParams] = useSearchParams();
+  const editMode = searchParams.get('editar') === '1';
+  const navigate = useNavigate();
+  const { dynamicQuestionIndex, setDynamicQuestionIndex, finishEditing } = useApp();
   const { notify } = useToast();
 
   const [questions, setQuestions] = useState([]);
@@ -88,7 +86,7 @@ function DynamicQuestionForm({ editMode = false }) {
       if (editMode) {
         finishEditing();
       } else if (isLastQuestion) {
-        goToFinalResume();
+        navigate(routes.idea(ideaId));
       } else {
         setDynamicQuestionIndex(dynamicQuestionIndex + 1);
       }
@@ -103,7 +101,7 @@ function DynamicQuestionForm({ editMode = false }) {
     if (editMode) {
       finishEditing();
     } else if (isFirstQuestion) {
-      goToResumen();
+      navigate(routes.resumen(ideaId));
     } else {
       setDynamicQuestionIndex(dynamicQuestionIndex - 1);
     }
@@ -119,9 +117,9 @@ function DynamicQuestionForm({ editMode = false }) {
 
   if (questions.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
-        <p>{ERRORS.LOAD_DYNAMIC_QUESTIONS}</p>
-        <button onClick={load} style={{ padding: '0.75rem 1.5rem', cursor: 'pointer' }}>
+      <div className="px-4 py-12 text-center text-stone">
+        <p className="font-body">{ERRORS.LOAD_DYNAMIC_QUESTIONS}</p>
+        <button onClick={load} className="ds-btn ds-btn-outline mt-3">
           Reintentar
         </button>
       </div>
@@ -131,7 +129,7 @@ function DynamicQuestionForm({ editMode = false }) {
   const nextDisabled = saving || !trimmed || isTooShort;
 
   return (
-    <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem' }}>
+    <div className="mx-auto max-w-[700px]">
       <QuestionHeader
         currentIndex={dynamicQuestionIndex}
         total={questions.length}
@@ -146,34 +144,22 @@ function DynamicQuestionForm({ editMode = false }) {
       />
 
       <div
-        style={{
-          fontSize: '0.85rem',
-          color: trimmed && isTooShort ? '#dc3545' : '#666',
-          marginTop: '0.25rem',
-        }}
+        className="mt-1 font-body text-xs"
+        style={{ color: trimmed && isTooShort ? 'var(--color-danger)' : 'var(--color-stone)' }}
       >
         {trimmed.length}/{MIN_ANSWER_LENGTH} caracteres mínimos
       </div>
 
-      <div style={{ marginTop: '1rem' }}>
+      <div className="mt-4">
         <ErrorMessage message={error} />
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+      <div className="mt-4 flex gap-4">
         <button
           type="button"
           onClick={handlePrevious}
           disabled={saving}
-          style={{
-            flex: 1,
-            padding: '0.75rem 1.5rem',
-            fontSize: '1rem',
-            backgroundColor: saving ? '#ccc' : '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: saving ? 'not-allowed' : 'pointer',
-          }}
+          className="ds-btn ds-btn-outline flex-1"
         >
           {editMode ? 'Volver al resumen final' : 'Anterior'}
         </button>
@@ -181,16 +167,7 @@ function DynamicQuestionForm({ editMode = false }) {
           type="button"
           onClick={handleNext}
           disabled={nextDisabled}
-          style={{
-            flex: 1,
-            padding: '0.75rem 1.5rem',
-            fontSize: '1rem',
-            backgroundColor: nextDisabled ? '#ccc' : isLastQuestion ? '#dc3545' : '#28a745',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: nextDisabled ? 'not-allowed' : 'pointer',
-          }}
+          className={`ds-btn flex-1 ${isLastQuestion ? 'ds-btn-ink' : 'ds-btn-amber'}`}
         >
           {saving
             ? 'Guardando...'

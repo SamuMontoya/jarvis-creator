@@ -5,6 +5,7 @@ import { dynamicRespuestaSchema, firstValidationMessage } from '../validators.js
 import { HTTP_STATUS, MESSAGES, GROQ_MODEL, DYNAMIC_QUESTIONS_COUNT } from '../config.js';
 import { sendDbError } from '../errorHandler.js';
 import { logger } from '../logger.js';
+import { formatGroqError } from '../groqErrors.js';
 
 const router = express.Router();
 
@@ -133,9 +134,10 @@ router.post('/ideas/:id/generate-dynamic-questions', async (req, res, next) => {
       questions = await askGroqForQuestions(idea, respuestas);
     } catch (groqError) {
       logger.error('Groq generation failed', groqError);
-      return res
-        .status(HTTP_STATUS.SERVER_ERROR)
-        .json({ status: 'error', message: MESSAGES.GROQ_ERROR });
+      return res.status(HTTP_STATUS.SERVER_ERROR).json({
+        status: 'error',
+        message: formatGroqError(groqError, MESSAGES.GROQ_ERROR),
+      });
     }
 
     const { data: inserted, error: insertError } = await supabase
