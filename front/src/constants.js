@@ -40,6 +40,9 @@ export const ERRORS = {
   UPDATE_IDEA: 'No pudimos actualizar el estado de tu idea.',
   GENERATE_QUESTIONS: 'No pudimos generar las preguntas de análisis profundo.',
   GENERATE_DOCUMENT: 'No pudimos generar el documento.',
+  LOAD_PLAN: 'No pudimos cargar el plan de trabajo.',
+  UPDATE_ESTADO: 'No pudimos actualizar el estado.',
+  GENERATE_PLAN: 'No pudimos generar el plan de trabajo.',
 };
 
 export const SUCCESS = {
@@ -48,4 +51,5 @@ export const SUCCESS = {
   IDEA_DELETED: 'Idea eliminada',
   IDEA_COMPLETED: 'Idea finalizada',
   DOCUMENT_READY: 'Documento descargado',
+  PLAN_READY: 'Plan de trabajo generado',
 };

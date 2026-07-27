@@ -175,7 +175,7 @@ function DynamicQuestionForm({ editMode = false }) {
             cursor: saving ? 'not-allowed' : 'pointer',
           }}
         >
-          {editMode ? 'Volver al resumen' : 'Anterior'}
+          {editMode ? 'Volver al resumen final' : 'Anterior'}
         </button>
         <button
           type="button"

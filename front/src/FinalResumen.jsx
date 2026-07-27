@@ -7,7 +7,6 @@ import { useApp } from './context/AppContext';
 import { useToast } from './context/ToastContext';
 import { api } from './api';
 import { SUCCESS, IDEA_STATES, QUESTION_TYPES } from './constants';
-import { markdownToPdf } from './markdownToPdf';
 
 function downloadBlob(content, mimeType, filename) {
   const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
@@ -20,7 +19,7 @@ function downloadBlob(content, mimeType, filename) {
   URL.revokeObjectURL(url);
 }
 
-function FinalResumen() {
+function FinalResumen({ onGeneratePlan, planId = null, generatingPlan = false }) {
   const { ideaId, editQuestion, startDynamicQuestions, goToIdeas } = useApp();
   const { notify } = useToast();
 
@@ -76,30 +75,11 @@ function FinalResumen() {
     [notify]
   );
 
-  const handleDownloadHTML = useCallback(
-    () =>
-      runDownload(async () => {
-        const { html } = await api.generateHtml(ideaId);
-        downloadBlob(html, 'text/html', `${fileStem}.html`);
-      }),
-    [runDownload, ideaId, fileStem]
-  );
-
   const handleDownloadMarkdown = useCallback(
     () =>
       runDownload(async () => {
         const { markdown } = await api.generateMarkdown(ideaId);
         downloadBlob(markdown, 'text/markdown', `${fileStem}.md`);
-      }),
-    [runDownload, ideaId, fileStem]
-  );
-
-  const handleDownloadPDF = useCallback(
-    () =>
-      runDownload(async () => {
-        const { markdown } = await api.generateMarkdownSource(ideaId);
-        const doc = await markdownToPdf(markdown);
-        doc.save(`${fileStem}.pdf`);
       }),
     [runDownload, ideaId, fileStem]
   );
@@ -187,11 +167,33 @@ function FinalResumen() {
 
       <BotonesDescarga
         onBack={startDynamicQuestions}
-        onDownloadHTML={handleDownloadHTML}
         onDownloadMarkdown={handleDownloadMarkdown}
-        onDownloadPDF={handleDownloadPDF}
         loading={busy}
       />
+
+      <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+        <button
+          onClick={() => onGeneratePlan(ideaId)}
+          disabled={generatingPlan || planId !== null}
+          title="Genera automáticamente épicas, historias, tareas y subtareas"
+          style={{
+            padding: '1rem 2rem',
+            fontSize: '1.1rem',
+            fontWeight: 'bold',
+            backgroundColor: generatingPlan || planId !== null ? '#ccc' : '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: generatingPlan || planId !== null ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {generatingPlan
+            ? 'Generando plan...'
+            : planId !== null
+              ? 'Plan ya generado'
+              : 'Generar Plan de Trabajo'}
+        </button>
+      </div>
 
       <div style={{ textAlign: 'center', marginTop: '2rem' }}>
         <button

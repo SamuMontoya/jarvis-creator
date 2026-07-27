@@ -1,6 +1,6 @@
 import express from 'express';
 import supabase from '../supabaseClient.js';
-import { ideaSchema, updateIdeaSchema, firstValidationMessage } from '../validators.js';
+import { ideaSchema, updateIdeaSchema, ideaIdParamSchema, firstValidationMessage } from '../validators.js';
 import { HTTP_STATUS, MESSAGES } from '../config.js';
 import { sendDbError } from '../errorHandler.js';
 
@@ -87,6 +87,14 @@ router.get('/ideas/:id', async (req, res, next) => {
 
 router.patch('/ideas/:id', async (req, res, next) => {
   try {
+    const paramsValidation = ideaIdParamSchema.safeParse(req.params);
+    if (!paramsValidation.success) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        status: 'error',
+        message: firstValidationMessage(paramsValidation.error),
+      });
+    }
+
     const validation = updateIdeaSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(HTTP_STATUS.BAD_REQUEST).json({

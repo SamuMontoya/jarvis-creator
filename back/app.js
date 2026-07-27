@@ -6,6 +6,7 @@ import questionsRouter from './routes/questions.js';
 import respuestasRouter from './routes/respuestas.js';
 import dynamicQuestionsRouter from './routes/dynamicQuestions.js';
 import documentsRouter from './routes/documents.js';
+import plansRouter from './routes/plans.js';
 import { errorHandler } from './errorHandler.js';
 import { HTTP_STATUS } from './config.js';
 
@@ -34,6 +35,7 @@ app.use('/api', questionsRouter);
 app.use('/api', respuestasRouter);
 app.use('/api', dynamicQuestionsRouter);
 app.use('/api', documentsRouter);
+app.use('/api', plansRouter);
 
 app.use((req, res) => {
   res.status(HTTP_STATUS.NOT_FOUND).json({ status: 'error', message: 'Ruta no encontrada' });

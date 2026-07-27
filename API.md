@@ -323,23 +323,10 @@ Obtener resumen completo (idea + 5 genéricas + 10 dinámicas + respuestas).
 
 ---
 
-### POST /api/ideas/:id/generate-final-html
-
-Generar HTML final.
-
-**Response (200):**
-```json
-{
-  "status": "ok",
-  "html": "<html>...</html>"
-}
-```
-
----
-
 ### POST /api/ideas/:id/generate-final-markdown
 
-Generar Markdown final.
+Generar Markdown final. Es la única descarga que expone el frontend (HTML y
+PDF fueron retirados de la UI).
 
 **Response (200):**
 ```json
@@ -351,17 +338,170 @@ Generar Markdown final.
 
 ---
 
-### POST /api/ideas/:id/generate-final-pdf
+## Plan de Trabajo (Groq)
 
-Generar PDF final.
+Jerarquía lineal generada a partir de una idea: `work_plan → epicas → user_stories → tasks → subtasks`.
+Cada `user_story` trae exactamente 6 `tasks`, una por cada frente de `PLAN_FRENTES` (`definicion`,
+`ux_ui`, `frontend`, `backend`, `testing`, `devops`), y cada `task` trae de 2 a 3 `subtasks`
+(`tiempo_estimado_min` ≤ 30).
+
+### POST /api/ideas/:id/generate-plan
+
+Generar el plan de trabajo completo vía Groq. Idempotente: si la idea ya tiene un plan, devuelve el
+existente (`already_exists: true`) en vez de regenerar.
+
+**Response (201, primera vez):**
+```json
+{
+  "status": "ok",
+  "plan_id": "uuid",
+  "epicas_count": 3,
+  "stories_count": 12,
+  "tasks_count": 72,
+  "subtasks_count": 144
+}
+```
+
+**Response (200, ya existía):**
+```json
+{
+  "status": "ok",
+  "plan_id": "uuid",
+  "already_exists": true
+}
+```
+
+---
+
+### GET /api/plans/:plan_id/epicas
+
+Listar épicas de un plan, ordenadas por `orden`.
 
 **Response (200):**
 ```json
 {
   "status": "ok",
-  "pdf_url": "data:application/pdf;base64,..."
+  "epicas": [
+    { "id": "uuid", "plan_id": "uuid", "titulo": "...", "descripcion": "...", "orden": 1, "estado": "pendiente" }
+  ]
 }
 ```
+
+---
+
+### GET /api/epicas/:epica_id
+
+Obtener una épica.
+
+**Response (200):** `{ "status": "ok", "epica": {...} }`
+
+---
+
+### PATCH /api/epicas/:epica_id
+
+Actualizar título, descripción o estado de una épica.
+
+**Request:** `{ "estado": "en_progreso" }` (también acepta `titulo`, `descripcion`)
+
+**Response (200):** `{ "status": "ok", "epica": {...} }`
+
+---
+
+### GET /api/epicas/:epica_id/stories
+
+Listar user stories de una épica, ordenadas por `orden`.
+
+**Response (200):**
+```json
+{
+  "status": "ok",
+  "stories": [
+    { "id": "uuid", "epica_id": "uuid", "titulo": "...", "criterios_aceptacion": "...", "orden": 1, "estado": "pendiente" }
+  ]
+}
+```
+
+---
+
+### GET /api/stories/:story_id
+
+Obtener una user story. **Response (200):** `{ "status": "ok", "story": {...} }`
+
+---
+
+### PATCH /api/stories/:story_id
+
+Actualizar título, descripción, criterios de aceptación o estado.
+
+**Request:** `{ "estado": "completada" }`
+
+**Response (200):** `{ "status": "ok", "story": {...} }`
+
+---
+
+### GET /api/stories/:story_id/tasks
+
+Listar las 6 tasks de una story (una por frente), ordenadas por `orden`.
+
+**Response (200):**
+```json
+{
+  "status": "ok",
+  "tasks": [
+    { "id": "uuid", "user_story_id": "uuid", "titulo": "...", "frente": "definicion", "orden": 1, "estado": "pendiente" }
+  ]
+}
+```
+
+---
+
+### GET /api/tasks/:task_id
+
+Obtener una task. **Response (200):** `{ "status": "ok", "task": {...} }`
+
+---
+
+### PATCH /api/tasks/:task_id
+
+Actualizar título, descripción o estado.
+
+**Request:** `{ "estado": "en_progreso" }`
+
+**Response (200):** `{ "status": "ok", "task": {...} }`
+
+---
+
+### GET /api/tasks/:task_id/subtasks
+
+Listar subtasks de una task, ordenadas por `orden`.
+
+**Response (200):**
+```json
+{
+  "status": "ok",
+  "subtasks": [
+    { "id": "uuid", "task_id": "uuid", "titulo": "...", "tiempo_estimado_min": 20, "orden": 1, "estado": "pendiente" }
+  ]
+}
+```
+
+---
+
+### GET /api/subtasks/:subtask_id
+
+Obtener una subtask. **Response (200):** `{ "status": "ok", "subtask": {...} }`
+
+---
+
+### PATCH /api/subtasks/:subtask_id
+
+Actualizar título, descripción, estado o `tiempo_estimado_min` (debe ser ≤ 30).
+
+**Request:** `{ "estado": "completada" }`
+
+**Response (200):** `{ "status": "ok", "subtask": {...} }`
+
+**Response (400):** `tiempo_estimado_min` > 30 → `{ "status": "error", "message": "tiempo_estimado_min no puede ser mayor a 30" }`
 
 ---
 

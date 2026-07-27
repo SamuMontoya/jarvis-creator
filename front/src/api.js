@@ -5,7 +5,13 @@ async function request(path, { method = 'GET', body, fallbackError } = {}) {
   try {
     response = await fetch(`${API_BASE}${path}`, {
       method,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      // ngrok shows an HTML interstitial to anything that looks like a
+      // browser request; this header bypasses it so fetch() gets JSON. A
+      // no-op against a non-ngrok backend.
+      headers: {
+        'ngrok-skip-browser-warning': 'true',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
@@ -63,21 +69,55 @@ export const api = {
   saveDynamicRespuesta: (payload) =>
     request('/dynamic-respuestas', { method: 'POST', body: payload, fallbackError: ERRORS.SAVE_ANSWER }),
 
-  generateHtml: (ideaId) =>
-    request(`/ideas/${ideaId}/generate-final-html`, {
-      method: 'POST',
-      fallbackError: ERRORS.GENERATE_DOCUMENT,
-    }),
-
   generateMarkdown: (ideaId) =>
     request(`/ideas/${ideaId}/generate-final-markdown`, {
       method: 'POST',
       fallbackError: ERRORS.GENERATE_DOCUMENT,
     }),
 
-  generateMarkdownSource: (ideaId) =>
-    request(`/ideas/${ideaId}/generate-final-markdown`, {
+  generatePlan: (ideaId) =>
+    request(`/ideas/${ideaId}/generate-plan`, {
       method: 'POST',
-      fallbackError: ERRORS.GENERATE_DOCUMENT,
+      fallbackError: ERRORS.GENERATE_PLAN,
+    }),
+
+  getEpicas: (planId) =>
+    request(`/plans/${planId}/epicas`, { fallbackError: ERRORS.LOAD_PLAN }),
+
+  getStories: (epicaId) =>
+    request(`/epicas/${epicaId}/stories`, { fallbackError: ERRORS.LOAD_PLAN }),
+
+  getTasks: (storyId) =>
+    request(`/stories/${storyId}/tasks`, { fallbackError: ERRORS.LOAD_PLAN }),
+
+  getSubtasks: (taskId) =>
+    request(`/tasks/${taskId}/subtasks`, { fallbackError: ERRORS.LOAD_PLAN }),
+
+  updateEpica: (epicaId, payload) =>
+    request(`/epicas/${epicaId}`, {
+      method: 'PATCH',
+      body: payload,
+      fallbackError: ERRORS.UPDATE_ESTADO,
+    }),
+
+  updateStory: (storyId, payload) =>
+    request(`/stories/${storyId}`, {
+      method: 'PATCH',
+      body: payload,
+      fallbackError: ERRORS.UPDATE_ESTADO,
+    }),
+
+  updateTask: (taskId, payload) =>
+    request(`/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: payload,
+      fallbackError: ERRORS.UPDATE_ESTADO,
+    }),
+
+  updateSubtask: (subtaskId, payload) =>
+    request(`/subtasks/${subtaskId}`, {
+      method: 'PATCH',
+      body: payload,
+      fallbackError: ERRORS.UPDATE_ESTADO,
     }),
 };

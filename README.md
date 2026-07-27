@@ -81,15 +81,21 @@ jarvis-creator/
 
 ### Resúmenes y Generación
 - `GET /api/ideas/:id/summary` - Resumen completo (idea + 5 + 10)
-- `POST /api/ideas/:id/generate-final-html` - Generar HTML final
-- `POST /api/ideas/:id/generate-final-markdown` - Generar Markdown
-- `POST /api/ideas/:id/generate-final-pdf` - Generar PDF
+- `POST /api/ideas/:id/generate-final-markdown` - Generar Markdown (única descarga disponible)
+
+### Plan de Trabajo (Groq)
+- `POST /api/ideas/:id/generate-plan` - Generar épicas → stories → tasks → subtasks (idempotente)
+- `GET /api/plans/:plan_id/epicas` - Listar épicas de un plan
+- `GET/PATCH /api/epicas/:epica_id` - Obtener/actualizar épica (y `GET /epicas/:epica_id/stories`)
+- `GET/PATCH /api/stories/:story_id` - Obtener/actualizar story (y `GET /stories/:story_id/tasks`)
+- `GET/PATCH /api/tasks/:task_id` - Obtener/actualizar task (y `GET /tasks/:task_id/subtasks`)
+- `GET/PATCH /api/subtasks/:subtask_id` - Obtener/actualizar subtask
 
 ## Tests
 
 ```bash
 # Backend
-cd back && npm run test:vitest
+cd back && npm test
 
 # Frontend
 cd front && npm test

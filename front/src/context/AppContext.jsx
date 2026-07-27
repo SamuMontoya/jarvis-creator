@@ -38,6 +38,7 @@ export function AppProvider({ children }) {
   );
   const [editingQuestionType, setEditingQuestionType] = useState(null);
   const [editingQuestionIndex, setEditingQuestionIndex] = useState(null);
+  const [editingReturnStage, setEditingReturnStage] = useState(null);
   const [totalQuestions, setTotalQuestions] = useState(0);
 
   useEffect(() => {
@@ -97,25 +98,35 @@ export function AppProvider({ children }) {
     setStage(STAGES.QUESTIONS);
   }, [totalQuestions]);
 
-  const editQuestion = useCallback((type, index) => {
-    setEditingQuestionType(type);
-    setEditingQuestionIndex(index);
-    if (type === QUESTION_TYPES.GENERIC) {
-      setQuestionIndex(index);
-      setStage(STAGES.QUESTIONS_EDIT);
-    } else {
-      setDynamicQuestionIndex(index);
-      setStage(STAGES.DYNAMIC_QUESTIONS_EDIT);
-    }
-  }, []);
+  const editQuestion = useCallback(
+    (type, index) => {
+      // Remember the screen the edit was opened from (Resumen or Resumen
+      // Final) so finishEditing can return there, instead of guessing from
+      // the question type alone — a generic-question edit can be opened
+      // from either summary screen.
+      setEditingReturnStage(stage);
+      setEditingQuestionType(type);
+      setEditingQuestionIndex(index);
+      if (type === QUESTION_TYPES.GENERIC) {
+        setQuestionIndex(index);
+        setStage(STAGES.QUESTIONS_EDIT);
+      } else {
+        setDynamicQuestionIndex(index);
+        setStage(STAGES.DYNAMIC_QUESTIONS_EDIT);
+      }
+    },
+    [stage]
+  );
 
   const finishEditing = useCallback(() => {
     setStage(
-      editingQuestionType === QUESTION_TYPES.GENERIC ? STAGES.RESUMEN : STAGES.FINAL_RESUME
+      editingReturnStage ??
+        (editingQuestionType === QUESTION_TYPES.GENERIC ? STAGES.RESUMEN : STAGES.FINAL_RESUME)
     );
     setEditingQuestionType(null);
     setEditingQuestionIndex(null);
-  }, [editingQuestionType]);
+    setEditingReturnStage(null);
+  }, [editingQuestionType, editingReturnStage]);
 
   const value = useMemo(
     () => ({
@@ -126,6 +137,7 @@ export function AppProvider({ children }) {
       dynamicQuestionIndex,
       editingQuestionType,
       editingQuestionIndex,
+      editingReturnStage,
       totalQuestions,
       setIdeaText,
       setQuestionIndex,
@@ -150,6 +162,7 @@ export function AppProvider({ children }) {
       dynamicQuestionIndex,
       editingQuestionType,
       editingQuestionIndex,
+      editingReturnStage,
       totalQuestions,
       goToIdeas,
       goToNewIdea,

@@ -240,31 +240,16 @@ describe('SeccionRespuestas', () => {
 
 describe('BotonesDescarga', () => {
   it('deshabilita todas las descargas mientras genera', () => {
-    render(
-      <BotonesDescarga
-        onBack={() => {}}
-        onDownloadHTML={() => {}}
-        onDownloadMarkdown={() => {}}
-        onDownloadPDF={() => {}}
-        loading
-      />
-    );
+    render(<BotonesDescarga onBack={() => {}} onDownloadMarkdown={() => {}} loading />);
 
     screen.getAllByRole('button').forEach((button) => expect(button).toBeDisabled());
   });
 
-  it('expone las tres descargas', () => {
-    render(
-      <BotonesDescarga
-        onBack={() => {}}
-        onDownloadHTML={() => {}}
-        onDownloadMarkdown={() => {}}
-        onDownloadPDF={() => {}}
-      />
-    );
+  it('solo expone Markdown, sin HTML ni PDF', () => {
+    render(<BotonesDescarga onBack={() => {}} onDownloadMarkdown={() => {}} />);
 
-    expect(screen.getByRole('button', { name: /Descargar HTML/ })).toBeEnabled();
     expect(screen.getByRole('button', { name: /Descargar Markdown/ })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /Descargar PDF/ })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /Descargar HTML/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Descargar PDF/ })).not.toBeInTheDocument();
   });
 });

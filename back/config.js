@@ -7,6 +7,21 @@ export const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
 export const DYNAMIC_QUESTIONS_COUNT = 10;
 
+// Orden fijo de frentes dentro de cada user story: una task por frente, en este orden.
+export const PLAN_FRENTES = ['definicion', 'ux_ui', 'frontend', 'backend', 'testing', 'devops'];
+
+export const PLAN_MAX_TOKENS = 20000;
+
+export const EPICA_ESTADOS = ['pendiente', 'en_progreso', 'completada'];
+
+export const STORY_ESTADOS = ['pendiente', 'en_progreso', 'completada'];
+
+export const TASK_ESTADOS = ['pendiente', 'en_progreso', 'completada'];
+
+export const SUBTASK_ESTADOS = ['pendiente', 'en_progreso', 'completada'];
+
+export const MAX_SUBTASK_MINUTOS = 30;
+
 export const MIN_IDEA_LENGTH = 10;
 export const MIN_ANSWER_LENGTH = 5;
 
@@ -28,4 +43,9 @@ export const MESSAGES = {
   DYNAMIC_Q_NOT_EXISTS: 'La pregunta indicada no existe',
   NO_ANSWERS_YET: 'Responde las preguntas iniciales antes de generar el análisis profundo',
   GROQ_ERROR: 'No pudimos generar las preguntas de análisis profundo. Inténtalo de nuevo.',
+  PLAN_GROQ_ERROR: 'No pudimos generar el plan de trabajo. Inténtalo de nuevo.',
+  EPICA_NOT_FOUND: 'Épica no encontrada',
+  STORY_NOT_FOUND: 'User story no encontrada',
+  TASK_NOT_FOUND: 'Task no encontrada',
+  SUBTASK_NOT_FOUND: 'Subtask no encontrada',
 };

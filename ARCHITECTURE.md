@@ -22,12 +22,14 @@ Estado global en App.jsx:
 
 ```
 App.jsx (orquestador)
+├── MainNav (tabs 'Ideas' | 'Plan')
 ├── IdeaForm (crear idea)
 ├── QuestionForm (5 preguntas genéricas)
 ├── ResumenForm (resumen + editar genéricas)
 ├── DynamicQuestionForm (10 preguntas dinámicas)
-├── FinalResumen (resumen final + descargas)
-└── MyIdeas (lista ideas + filtros)
+├── FinalResumen (resumen final + descarga Markdown + generar plan)
+├── MyIdeas (lista ideas + filtros)
+└── PlanView (árbol épica → story → task → subtask, checkboxes de estado)
 ```
 
 ### Data Flow
@@ -39,7 +41,9 @@ App.jsx (orquestador)
 5. **DynamicQuestionForm** → POST /api/ideas/:id/generate-dynamic-questions → mostrar 10
 6. **DynamicQuestionForm** → POST /api/dynamic-respuestas → FinalResumen
 7. **FinalResumen** → onEdit → QuestionForm/DynamicQuestionForm (editMode=true)
-8. **FinalResumen** → Descargar → POST /api/ideas/:id/generate-final-*
+8. **FinalResumen** → Descargar → POST /api/ideas/:id/generate-final-markdown
+9. **FinalResumen** → "Generar Plan de Trabajo" → POST /api/ideas/:id/generate-plan → habilita tab "Plan"
+10. **PlanView** → GET épicas/stories/tasks/subtasks en cascada → árbol expandible con PATCH de estado optimista
 
 ## Backend Architecture
 
@@ -61,9 +65,20 @@ GET /api/ideas/:id/dynamic-questions
 POST /api/dynamic-respuestas
 GET /api/ideas/:id/dynamic-respuestas
 GET /api/ideas/:id/summary
-POST /api/ideas/:id/generate-final-html
 POST /api/ideas/:id/generate-final-markdown
-POST /api/ideas/:id/generate-final-pdf
+POST /api/ideas/:id/generate-plan
+GET /api/plans/:plan_id/epicas
+GET /api/epicas/:epica_id
+PATCH /api/epicas/:epica_id
+GET /api/epicas/:epica_id/stories
+GET /api/stories/:story_id
+PATCH /api/stories/:story_id
+GET /api/stories/:story_id/tasks
+GET /api/tasks/:task_id
+PATCH /api/tasks/:task_id
+GET /api/tasks/:task_id/subtasks
+GET /api/subtasks/:subtask_id
+PATCH /api/subtasks/:subtask_id
 ```
 
 ### Target Structure (Refactor Plan)
@@ -130,6 +145,37 @@ documents
 - tipo (enum: 'html' | 'markdown' | 'pdf')
 - contenido (text)
 - created_at (timestamptz)
+
+work_plans
+- id (uuid, pk)
+- idea_id (uuid, fk -> ideas, unique)
+- created_at (timestamptz)
+
+epicas
+- id (uuid, pk)
+- plan_id (uuid, fk -> work_plans)
+- titulo (text), descripcion (text), orden (int)
+- estado (enum: 'pendiente' | 'en_progreso' | 'completada')
+
+user_stories
+- id (uuid, pk)
+- epica_id (uuid, fk -> epicas)
+- titulo (text), descripcion (text), criterios_aceptacion (text), orden (int)
+- estado (enum: 'pendiente' | 'en_progreso' | 'completada')
+
+tasks
+- id (uuid, pk)
+- user_story_id (uuid, fk -> user_stories)
+- titulo (text), descripcion (text), orden (int)
+- frente (enum: 'definicion' | 'ux_ui' | 'frontend' | 'backend' | 'testing' | 'devops')
+- estado (enum: 'pendiente' | 'en_progreso' | 'completada')
+
+subtasks
+- id (uuid, pk)
+- task_id (uuid, fk -> tasks)
+- titulo (text), descripcion (text), orden (int)
+- tiempo_estimado_min (int, ≤ 30)
+- estado (enum: 'pendiente' | 'en_progreso' | 'completada')
 ```
 
 ### External Services

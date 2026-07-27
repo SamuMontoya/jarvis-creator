@@ -165,6 +165,13 @@ describe('PATCH /api/ideas/:id', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('rechaza un id que no es un UUID con 400 en vez de reventar contra la base', async () => {
+    const res = await request(app).patch('/api/ideas/no-es-un-uuid').send({ estado: 'refined' });
+
+    expect(res.status).toBe(400);
+    expect(mockState.calls.some((c) => c.table === 'ideas')).toBe(false);
+  });
 });
 
 describe('DELETE /api/ideas/:id', () => {
@@ -440,33 +447,20 @@ describe('Generación de documentos', () => {
     expect(res.body.markdown).toContain('Bogotá primero');
   });
 
-  it('el PDF y el markdown comparten el mismo contenido fuente', async () => {
-    withData();
-    const md = await request(app).post(`/api/ideas/${IDEA_ID}/generate-final-markdown`);
-    withData();
-    const pdf = await request(app).post(`/api/ideas/${IDEA_ID}/generate-final-markdown`);
-
-    expect(pdf.status).toBe(200);
-    expect(pdf.body.markdown).toBeTruthy();
-    // Ambos se generan del mismo builder; solo cambia el timestamp de segundos.
-    expect(pdf.body.markdown.split('\n')[0]).toBe(md.body.markdown.split('\n')[0]);
-  });
-
-  it('el HTML escapa el contenido del usuario', async () => {
+  it('el markdown escapa caracteres especiales de Markdown', async () => {
     mockTables({
-      ideas: { data: { ...idea, texto_idea: '<script>alert(1)</script>' } },
+      ideas: { data: { ...idea, texto_idea: '# Título con *énfasis* [raro]' } },
       respuestas: {
-        data: [{ respuesta: '<img src=x onerror=alert(2)>', generic_questions: { pregunta: 'P' } }],
+        data: [{ respuesta: 'Usa `code` y _cursiva_', generic_questions: { pregunta: 'P' } }],
       },
       dynamic_respuestas: { data: [] },
     });
 
-    const res = await request(app).post(`/api/ideas/${IDEA_ID}/generate-final-html`);
+    const res = await request(app).post(`/api/ideas/${IDEA_ID}/generate-final-markdown`);
 
     expect(res.status).toBe(200);
-    expect(res.body.html).not.toContain('<script>alert(1)</script>');
-    expect(res.body.html).not.toContain('<img src=x');
-    expect(res.body.html).toContain('&lt;script&gt;');
+    expect(res.body.markdown).toContain('\\*énfasis\\*');
+    expect(res.body.markdown).toContain('\\`code\\`');
   });
 
   it('devuelve 404 si la idea no existe', async () => {
@@ -477,20 +471,9 @@ describe('Generación de documentos', () => {
     expect(res.status).toBe(404);
   });
 
-  it('sigue entregando el HTML aunque no se pueda cachear md_final', async () => {
-    let ideasCall = 0;
-    mockTables({
-      ideas: () => {
-        ideasCall += 1;
-        return ideasCall === 1 ? { data: idea } : { error: { message: 'read only' } };
-      },
-      respuestas: { data: [] },
-      dynamic_respuestas: { data: [] },
-    });
-
+  it('ya no expone generate-final-html', async () => {
     const res = await request(app).post(`/api/ideas/${IDEA_ID}/generate-final-html`);
 
-    expect(res.status).toBe(200);
-    expect(res.body.html).toContain('Una app para pasear perros');
+    expect(res.status).toBe(404);
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -419,6 +419,18 @@ describe('Resumen final y descargas', () => {
     expect(screen.getByText('1. Pregunta dinámica 1')).toBeInTheDocument();
   });
 
+  it('solo ofrece la descarga en Markdown, sin HTML ni PDF', async () => {
+    seedFinal();
+    setupFinal();
+
+    renderApp(<App />);
+    await screen.findByText('Resumen Final Completo');
+
+    expect(screen.getByRole('button', { name: /Descargar Markdown/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Descargar HTML/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Descargar PDF/ })).not.toBeInTheDocument();
+  });
+
   it('descarga el Markdown generado por el backend', async () => {
     const user = userEvent.setup();
     seedFinal();
@@ -436,44 +448,6 @@ describe('Resumen final y descargas', () => {
     });
     expect(global.URL.createObjectURL).toHaveBeenCalled();
     expect(await screen.findByText('Documento descargado')).toBeInTheDocument();
-  });
-
-  it('descarga el HTML generado por el backend', async () => {
-    const user = userEvent.setup();
-    seedFinal();
-    const calls = setupFinal({
-      'POST /generate-final-html': { html: '<html><body>Mi idea</body></html>' },
-    });
-
-    renderApp(<App />);
-    await screen.findByText('Resumen Final Completo');
-
-    await user.click(screen.getByRole('button', { name: /Descargar HTML/ }));
-
-    await waitFor(() => {
-      expect(calls.some((c) => c.url.includes('generate-final-html'))).toBe(true);
-    });
-    expect(global.URL.createObjectURL).toHaveBeenCalled();
-  });
-
-  it('convierte el markdown a PDF en el cliente', async () => {
-    const user = userEvent.setup();
-    const save = vi.fn();
-    vi.doMock('../src/markdownToPdf', () => ({ markdownToPdf: async () => ({ save }) }));
-
-    seedFinal();
-    const calls = setupFinal({
-      'POST /generate-final-markdown': { markdown: '# Mi idea\n\nContenido' },
-    });
-
-    renderApp(<App />);
-    await screen.findByText('Resumen Final Completo');
-
-    await user.click(screen.getByRole('button', { name: /Descargar PDF/ }));
-
-    await waitFor(() => {
-      expect(calls.some((c) => c.url.includes('generate-final-markdown'))).toBe(true);
-    });
   });
 
   it('avisa al usuario si la generación falla', async () => {
@@ -494,7 +468,7 @@ describe('Resumen final y descargas', () => {
     expect(await screen.findByText('No pudimos generar el documento.')).toBeInTheDocument();
   });
 
-  it('finalizar marca la idea como refined y vuelve al listado', async () => {
+  it('finalizar marca la idea como refined, avisa y vuelve al listado', async () => {
     const user = userEvent.setup();
     seedFinal();
     const calls = setupFinal({
@@ -510,6 +484,29 @@ describe('Resumen final y descargas', () => {
       const patch = calls.find((c) => c.method === 'PATCH');
       expect(patch?.body).toEqual({ estado: 'refined' });
     });
+
+    expect(await screen.findByText('Idea finalizada')).toBeInTheDocument();
+    expect(await screen.findByText('Mis Ideas')).toBeInTheDocument();
+  });
+
+  it('si el backend rechaza el PATCH, avisa el error y se queda en el resumen', async () => {
+    const user = userEvent.setup();
+    seedFinal();
+    setupFinal({
+      'PATCH /ideas': {
+        status: 500,
+        body: { status: 'error', message: 'No pudimos actualizar el estado de tu idea.' },
+      },
+    });
+
+    renderApp(<App />);
+    await screen.findByText('Resumen Final Completo');
+
+    await user.click(screen.getByRole('button', { name: 'Finalizar idea' }));
+
+    expect(await screen.findByText('No pudimos actualizar el estado de tu idea.')).toBeInTheDocument();
+    expect(screen.getByText('Resumen Final Completo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Finalizar idea' })).toBeEnabled();
   });
 });
 

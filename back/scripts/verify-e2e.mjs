@@ -194,19 +194,10 @@ async function main() {
     return `${markdown.length} caracteres`;
   });
 
-  await step('j. POST /generate-final-markdown — fuente del markdown', async () => {
-    const { markdown } = await api(`/ideas/${ideaId}/generate-final-markdown`, { method: 'POST' });
-    assert(markdown?.length > 500, 'markdown demasiado corto');
-    return `${markdown.length} caracteres`;
-  });
-
-  await step('k. POST /generate-final-html — escapa contenido', async () => {
-    const { html } = await api(`/ideas/${ideaId}/generate-final-html`, { method: 'POST' });
-    assert(html.startsWith('<!DOCTYPE html>'), 'no es un documento HTML');
-    assert(html.includes('Verificación E2E'), 'falta el texto de la idea');
-    const { idea } = await api(`/ideas/${ideaId}`);
-    assert(idea.md_final, 'no persistió md_final');
-    return `${html.length} caracteres · md_final guardado`;
+  await step('j. generate-final-html ya no existe (HTML/PDF fueron retirados)', async () => {
+    const res = await fetch(`${base}/ideas/${ideaId}/generate-final-html`, { method: 'POST' });
+    assert(res.status === 404, `esperaba 404, fue ${res.status}`);
+    return 'ruta eliminada confirmada';
   });
 
   await step('l. PATCH /api/ideas/:id — estado a refined', async () => {

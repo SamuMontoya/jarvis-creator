@@ -6,7 +6,7 @@ import ErrorMessage from './components/ErrorMessage';
 import { useApp } from './context/AppContext';
 import { useToast } from './context/ToastContext';
 import { api } from './api';
-import { ERRORS, SUCCESS, MIN_ANSWER_LENGTH } from './constants';
+import { ERRORS, SUCCESS, MIN_ANSWER_LENGTH, STAGES } from './constants';
 
 function QuestionForm({ editMode = false }) {
   const {
@@ -17,6 +17,7 @@ function QuestionForm({ editMode = false }) {
     goToResumen,
     goToIdeas,
     finishEditing,
+    editingReturnStage,
   } = useApp();
   const { notify } = useToast();
 
@@ -126,6 +127,8 @@ function QuestionForm({ editMode = false }) {
   }
 
   const nextDisabled = saving || !trimmed || isTooShort;
+  const backLabel =
+    editingReturnStage === STAGES.FINAL_RESUME ? 'Volver al resumen final' : 'Volver al resumen';
 
   return (
     <div style={{ maxWidth: '700px', margin: '2rem auto', padding: '1rem' }}>
@@ -172,7 +175,7 @@ function QuestionForm({ editMode = false }) {
             cursor: saving || (!editMode && isFirstQuestion) ? 'not-allowed' : 'pointer',
           }}
         >
-          {editMode ? 'Volver al resumen' : 'Anterior'}
+          {editMode ? backLabel : 'Anterior'}
         </button>
         <button
           type="button"
