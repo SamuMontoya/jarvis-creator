@@ -90,15 +90,36 @@ REGLAS DE ESPECIFICIDAD PARA SUBTASKS (OBLIGATORIO):
   ]
 }`;
 
+// Groq's on-demand tier caps this model at 12,000 tokens per minute, prompt
+// + completion combined. A fixed max_tokens works until a longer idea/answer
+// set pushes the prompt itself past that ceiling (413 "Request too large") —
+// so the completion budget is trimmed to whatever headroom the prompt left,
+// instead of always requesting the full PLAN_MAX_TOKENS.
+const GROQ_TPM_LIMIT = 12000;
+const GROQ_TPM_SAFETY_MARGIN = 300;
+const MIN_PLAN_COMPLETION_TOKENS = 3000;
+
+// ~4 characters per token is a standard rough estimate for English/Spanish
+// text; no tokenizer dependency needed for a safety-margin calculation.
+const estimateTokens = (text) => Math.ceil(text.length / 4);
+
 async function askGroqForPlan(idea, genRespuestas, dynRespuestas) {
+  const systemPrompt = SYSTEM_PROMPT;
+  const userPrompt = buildPrompt(idea, genRespuestas, dynRespuestas);
+  const promptTokens = estimateTokens(systemPrompt) + estimateTokens(userPrompt);
+  const maxTokens = Math.max(
+    MIN_PLAN_COMPLETION_TOKENS,
+    Math.min(PLAN_MAX_TOKENS, GROQ_TPM_LIMIT - GROQ_TPM_SAFETY_MARGIN - promptTokens)
+  );
+
   const completion = await groq.chat.completions.create({
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: buildPrompt(idea, genRespuestas, dynRespuestas) },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
     ],
     model: GROQ_MODEL,
     temperature: 0.3,
-    max_tokens: PLAN_MAX_TOKENS,
+    max_tokens: maxTokens,
     response_format: { type: 'json_object' },
   });
 

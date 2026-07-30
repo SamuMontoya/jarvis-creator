@@ -184,8 +184,25 @@ describe('Plans E2E', () => {
     const res = await request(app).post(`/api/ideas/${IDEA_ID}/generate-plan`);
 
     expect(res.status).toBe(500);
-    expect(res.body.message).toMatch(/límite diario/);
+    expect(res.body.message).toMatch(/límite de uso/);
     expect(res.body.message).toMatch(/16 minutos/);
+  });
+
+  test('POST /api/ideas/:id/generate-plan — si Groq da 413, avisa que la solicitud es muy grande', async () => {
+    const tooLargeError = Object.assign(new Error('Request too large'), { status: 413 });
+    groqCreate.mockRejectedValue(tooLargeError);
+
+    mockTables({
+      work_plans: { data: null },
+      ideas: { data: idea },
+      respuestas: { data: [] },
+      dynamic_respuestas: { data: [] },
+    });
+
+    const res = await request(app).post(`/api/ideas/${IDEA_ID}/generate-plan`);
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toMatch(/demasiado extensas/);
   });
 
   test('GET /api/plans/:plan_id/epicas — lista épicas ordenadas', async () => {
